@@ -5,6 +5,10 @@
   "version": "0.1.0",
   "publisher": "tile-ai",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/love1angel/tiled.git"
+  },
   "engines": {
     "vscode": "^1.82.0"
   },
