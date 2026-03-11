@@ -1,0 +1,147 @@
+name: CI — Build & Package
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Python Language Server ──────────────────────────────────
+  server:
+    name: Server (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        working-directory: tiled-server
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" 2>/dev/null || pip install -e .
+          pip install pytest
+
+      - name: Run tests
+        working-directory: tiled-server
+        run: pytest
+
+      - name: Build wheel & sdist
+        working-directory: tiled-server
+        run: |
+          pip install build
+          python -m build
+
+      - name: Upload server artifacts
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-dist
+          path: tiled-server/dist/
+
+  # ── VS Code Extension ──────────────────────────────────────
+  extension:
+    name: Extension (VS Code)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: tiled-vscode
+        run: npm ci
+
+      - name: Compile TypeScript
+        working-directory: tiled-vscode
+        run: npm run compile
+
+      - name: Package .vsix
+        working-directory: tiled-vscode
+        run: npx @vscode/vsce package --no-dependencies
+
+      - name: Upload .vsix
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-vsix
+          path: tiled-vscode/*.vsix
+
+  # ── Release (only on tags) ─────────────────────────────────
+  release:
+    name: Create Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [server, extension]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/server-dist/*
+            artifacts/extension-vsix/*.vsix
+          generate_release_notes: true
+
+  # ── Publish to PyPI ────────────────────────────────────────
+  publish-pypi:
+    name: Publish to PyPI
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [server]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write          # Required for trusted publishing
+    environment: pypi
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: server-dist
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  # ── Publish to VS Code Marketplace ─────────────────────────
+  publish-marketplace:
+    name: Publish to VS Code Marketplace
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [extension]
+    runs-on: ubuntu-latest
+    environment: marketplace
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-vsix
+          path: vsix
+
+      - name: Publish to VS Code Marketplace
+        run: npx @vscode/vsce publish --packagePath vsix/*.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Publish to Open VSX Registry
+        run: npx ovsx publish vsix/*.vsix
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}

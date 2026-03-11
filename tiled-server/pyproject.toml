@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tiled-lsp"
+version = "0.1.0"
+description = "Language server for the TileLang DSL"
+requires-python = ">=3.9"
+dependencies = [
+    "pygls>=1.3.0",
+    "lsprotocol>=2023.0.0",
+]
+
+[project.scripts]
+tiled = "tiled_server.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["tiled_server*"]

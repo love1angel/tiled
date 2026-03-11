@@ -1,0 +1,171 @@
+{
+  "TileLang Import": {
+    "prefix": "tl-import",
+    "body": [
+      "import tilelang",
+      "import tilelang.language as T"
+    ],
+    "description": "Import tilelang and its language module"
+  },
+  "TileLang GEMM Kernel": {
+    "prefix": "tl-gemm",
+    "body": [
+      "import tilelang",
+      "import tilelang.language as T",
+      "",
+      "",
+      "@tilelang.jit(out_idx=[-1])",
+      "def matmul(M, N, K, block_M, block_N, block_K, dtype=T.float16, accum_dtype=T.float32):",
+      "    @T.prim_func",
+      "    def gemm(",
+      "        A: T.Tensor((M, K), dtype),",
+      "        B: T.Tensor((K, N), dtype),",
+      "        C: T.Tensor((M, N), dtype),",
+      "    ):",
+      "        with T.Kernel(T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=128) as (bx, by):",
+      "            A_shared = T.alloc_shared((block_M, block_K), dtype)",
+      "            B_shared = T.alloc_shared((block_K, block_N), dtype)",
+      "            C_local = T.alloc_fragment((block_M, block_N), accum_dtype)",
+      "",
+      "            T.clear(C_local)",
+      "            for k in T.Pipelined(T.ceildiv(K, block_K), num_stages=3):",
+      "                T.copy(A[by * block_M, k * block_K], A_shared)",
+      "                T.copy(B[k * block_K, bx * block_N], B_shared)",
+      "                T.gemm(A_shared, B_shared, C_local)",
+      "",
+      "            T.copy(C_local, C[by * block_M, bx * block_N])",
+      "",
+      "    return gemm"
+    ],
+    "description": "TileLang GEMM kernel template"
+  },
+  "TileLang Elementwise Kernel": {
+    "prefix": "tl-elementwise",
+    "body": [
+      "import tilelang",
+      "import tilelang.language as T",
+      "",
+      "",
+      "@tilelang.jit(out_idx=[-1])",
+      "def elementwise_op(M, N, block_M, block_N, dtype=T.float32):",
+      "    @T.prim_func",
+      "    def kernel(",
+      "        A: T.Tensor((M, N), dtype),",
+      "        B: T.Tensor((M, N), dtype),",
+      "        C: T.Tensor((M, N), dtype),",
+      "    ):",
+      "        with T.Kernel(T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=128) as (bx, by):",
+      "            A_shared = T.alloc_shared((block_M, block_N), dtype)",
+      "            B_shared = T.alloc_shared((block_M, block_N), dtype)",
+      "            C_local = T.alloc_fragment((block_M, block_N), dtype)",
+      "",
+      "            T.copy(A[by * block_M, bx * block_N], A_shared)",
+      "            T.copy(B[by * block_M, bx * block_N], B_shared)",
+      "            for i, j in T.Parallel(block_M, block_N):",
+      "                C_local[i, j] = A_shared[i, j] + B_shared[i, j]",
+      "            T.copy(C_local, C[by * block_M, bx * block_N])",
+      "",
+      "    return kernel"
+    ],
+    "description": "TileLang element-wise kernel template"
+  },
+  "TileLang Kernel Skeleton": {
+    "prefix": "tl-kernel",
+    "body": [
+      "@T.prim_func",
+      "def ${1:kernel_name}(",
+      "    ${2:A}: T.Tensor((${3:M}, ${4:N}), ${5:dtype}),",
+      "):",
+      "    with T.Kernel(${6:grid_x}, ${7:grid_y}, threads=${8:128}) as (bx, by):",
+      "        $0"
+    ],
+    "description": "TileLang kernel function skeleton"
+  },
+  "TileLang JIT Wrapper": {
+    "prefix": "tl-jit",
+    "body": [
+      "@tilelang.jit(out_idx=[${1:-1}])",
+      "def ${2:func_name}(${3:M, N, K}):",
+      "    @T.prim_func",
+      "    def ${4:impl}(",
+      "        ${5:A}: T.Tensor((${6:M}, ${7:N}), ${8:dtype}),",
+      "    ):",
+      "        with T.Kernel(${9:grid_x}, ${10:grid_y}, threads=${11:128}) as (bx, by):",
+      "            $0",
+      "",
+      "    return ${4:impl}"
+    ],
+    "description": "TileLang JIT-compiled kernel wrapper"
+  },
+  "TileLang Alloc Shared": {
+    "prefix": "tl-alloc-shared",
+    "body": "${1:buf} = T.alloc_shared((${2:block_M}, ${3:block_K}), ${4:dtype})",
+    "description": "Allocate shared memory buffer"
+  },
+  "TileLang Alloc Fragment": {
+    "prefix": "tl-alloc-fragment",
+    "body": "${1:buf} = T.alloc_fragment((${2:block_M}, ${3:block_N}), ${4:dtype})",
+    "description": "Allocate fragment buffer"
+  },
+  "TileLang Pipelined Loop": {
+    "prefix": "tl-pipelined",
+    "body": [
+      "for ${1:k} in T.Pipelined(T.ceildiv(${2:K}, ${3:block_K}), num_stages=${4:3}):",
+      "    $0"
+    ],
+    "description": "Software-pipelined loop"
+  },
+  "TileLang Parallel Loop": {
+    "prefix": "tl-parallel",
+    "body": [
+      "for ${1:i}, ${2:j} in T.Parallel(${3:block_M}, ${4:block_N}):",
+      "    $0"
+    ],
+    "description": "Parallel element-wise loop"
+  },
+  "TileLang Copy": {
+    "prefix": "tl-copy",
+    "body": "T.copy(${1:src}, ${2:dst})",
+    "description": "Copy data between buffers"
+  },
+  "TileLang Reduce Sum": {
+    "prefix": "tl-reduce-sum",
+    "body": "T.reduce_sum(${1:src}, ${2:dst}, dim=${3:0})",
+    "description": "Sum reduction along a dimension"
+  },
+  "TileLang Flash Attention Pattern": {
+    "prefix": "tl-attention",
+    "body": [
+      "@tilelang.jit(out_idx=[-1])",
+      "def flash_attention(batch, heads, seq_len, head_dim, block_M, block_N, dtype=T.float16):",
+      "    @T.prim_func",
+      "    def attn(",
+      "        Q: T.Tensor((batch, heads, seq_len, head_dim), dtype),",
+      "        K: T.Tensor((batch, heads, seq_len, head_dim), dtype),",
+      "        V: T.Tensor((batch, heads, seq_len, head_dim), dtype),",
+      "        O: T.Tensor((batch, heads, seq_len, head_dim), dtype),",
+      "    ):",
+      "        with T.Kernel(T.ceildiv(seq_len, block_M), heads, batch, threads=128) as (bx, by, bz):",
+      "            Q_shared = T.alloc_shared((block_M, head_dim), dtype)",
+      "            K_shared = T.alloc_shared((block_N, head_dim), dtype)",
+      "            V_shared = T.alloc_shared((block_N, head_dim), dtype)",
+      "            O_local = T.alloc_fragment((block_M, head_dim), T.float32)",
+      "            score = T.alloc_fragment((block_M, block_N), T.float32)",
+      "",
+      "            T.clear(O_local)",
+      "            T.copy(Q[bz, by, bx * block_M, 0], Q_shared)",
+      "            for kv in T.Pipelined(T.ceildiv(seq_len, block_N), num_stages=2):",
+      "                T.copy(K[bz, by, kv * block_N, 0], K_shared)",
+      "                T.copy(V[bz, by, kv * block_N, 0], V_shared)",
+      "                T.clear(score)",
+      "                T.gemm(Q_shared, K_shared, score)  # Q @ K^T",
+      "                # softmax + accumulate would go here",
+      "                T.gemm(score, V_shared, O_local)  # score @ V",
+      "",
+      "            T.copy(O_local, O[bz, by, bx * block_M, 0])",
+      "",
+      "    return attn"
+    ],
+    "description": "Flash Attention kernel template (simplified)"
+  }
+}
