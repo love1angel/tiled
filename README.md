@@ -16,14 +16,28 @@ Language intelligence for the [TileLang](https://github.com/tile-ai/tilelang) GP
 
 ```
 tiled/
-├── tiled-server/          # Python LSP server (pygls)
+├── tiled-server/              # Python LSP server (pygls)
 │   ├── tiled_server/
-│   │   ├── __main__.py    # CLI entry point
-│   │   ├── server.py      # LSP handlers (completion, hover, diagnostics)
-│   │   └── knowledge.py   # TileLang API knowledge base
+│   │   ├── __main__.py        # CLI entry point
+│   │   ├── server.py          # Server factory & LSP handler wiring
+│   │   ├── detection.py       # Regex patterns & tilelang file detection
+│   │   ├── completion.py      # Completion provider
+│   │   ├── hover.py           # Hover provider
+│   │   ├── signature.py       # Signature help provider
+│   │   ├── diagnostics.py     # Diagnostics (common mistake warnings)
+│   │   ├── knowledge.py       # TileLang API knowledge base
+│   │   └── utils.py           # Shared helpers
+│   ├── tests/
+│   │   ├── conftest.py        # Shared test fixtures
+│   │   ├── test_knowledge.py
+│   │   ├── test_detection.py
+│   │   ├── test_completion.py
+│   │   ├── test_diagnostics.py
+│   │   ├── test_hover.py
+│   │   └── test_server_creation.py
 │   └── pyproject.toml
-└── tiled-vscode/          # VS Code extension (TypeScript)
-    ├── src/extension.ts   # Extension activation, launches tiled server
+└── tiled-vscode/              # VS Code extension (TypeScript)
+    ├── src/extension.ts       # Extension activation, launches tiled server
     ├── snippets/tilelang.json
     └── package.json
 ```
