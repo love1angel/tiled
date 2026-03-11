@@ -44,24 +44,41 @@ tiled/
 
 ## Installation
 
-### Language Server
+### From Release (recommended)
+
+Download the latest release from [GitHub Releases](https://github.com/love1angel/tiled/releases).
+
+**1. Install the language server:**
+
+```bash
+pip install tiled_lsp-0.1.0-py3-none-any.whl
+```
+
+**2. Install the VS Code extension:**
+
+```bash
+code --install-extension tiled-0.1.0.vsix
+```
+
+Or install the `.vsix` manually in VS Code: Extensions sidebar → `···` menu → "Install from VSIX..."
+
+### From Source
+
+**Language Server:**
 
 ```bash
 cd tiled-server
 pip install -e .
-# Now `tiled` is available as a CLI command
 tiled --help
 ```
 
-### VS Code Extension
+**VS Code Extension:**
 
 ```bash
 cd tiled-vscode
 npm install
 npm run compile
-# Package as .vsix:
 npx @vscode/vsce package
-# Install in VS Code:
 code --install-extension tiled-0.1.0.vsix
 ```
 
