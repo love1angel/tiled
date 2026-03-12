@@ -4,44 +4,6 @@
 
 Language intelligence for the [TileLang](https://github.com/tile-ai/tilelang) GPU kernel DSL.
 
-## Features
-
-- **Auto-completion** for `T.*` API (alloc_shared, gemm, Pipelined, etc.)
-- **Hover documentation** with signatures and examples
-- **Diagnostics** — warns about common mistakes (missing T.clear before T.gemm, etc.)
-- **Signature help** when typing function arguments
-- **Snippets** — `tl-gemm`, `tl-elementwise`, `tl-kernel`, `tl-attention`, etc.
-
-## Architecture
-
-```
-tiled/
-├── tiled-server/              # Python LSP server (pygls)
-│   ├── tiled_server/
-│   │   ├── __main__.py        # CLI entry point
-│   │   ├── server.py          # Server factory & LSP handler wiring
-│   │   ├── detection.py       # Regex patterns & tilelang file detection
-│   │   ├── completion.py      # Completion provider
-│   │   ├── hover.py           # Hover provider
-│   │   ├── signature.py       # Signature help provider
-│   │   ├── diagnostics.py     # Diagnostics (common mistake warnings)
-│   │   ├── knowledge.py       # TileLang API knowledge base
-│   │   └── utils.py           # Shared helpers
-│   ├── tests/
-│   │   ├── conftest.py        # Shared test fixtures
-│   │   ├── test_knowledge.py
-│   │   ├── test_detection.py
-│   │   ├── test_completion.py
-│   │   ├── test_diagnostics.py
-│   │   ├── test_hover.py
-│   │   └── test_server_creation.py
-│   └── pyproject.toml
-└── tiled-vscode/              # VS Code extension (TypeScript)
-    ├── src/extension.ts       # Extension activation, launches tiled server
-    ├── snippets/tilelang.json
-    └── package.json
-```
-
 ## Installation
 
 ### From Release (recommended)
@@ -126,6 +88,44 @@ Type `T.` to get completions for all TileLang language constructs:
 | `tiled.server.pythonPath` | `python3` | Python interpreter |
 | `tiled.server.path` | `""` | Custom server path |
 | `tiled.trace.server` | `off` | LSP trace level |
+
+## Features
+
+- **Auto-completion** for `T.*` API (alloc_shared, gemm, Pipelined, etc.)
+- **Hover documentation** with signatures and examples
+- **Diagnostics** — warns about common mistakes (missing T.clear before T.gemm, etc.)
+- **Signature help** when typing function arguments
+- **Snippets** — `tl-gemm`, `tl-elementwise`, `tl-kernel`, `tl-attention`, etc.
+
+## Architecture
+
+```
+tiled/
+├── tiled-server/              # Python LSP server (pygls)
+│   ├── tiled_server/
+│   │   ├── __main__.py        # CLI entry point
+│   │   ├── server.py          # Server factory & LSP handler wiring
+│   │   ├── detection.py       # Regex patterns & tilelang file detection
+│   │   ├── completion.py      # Completion provider
+│   │   ├── hover.py           # Hover provider
+│   │   ├── signature.py       # Signature help provider
+│   │   ├── diagnostics.py     # Diagnostics (common mistake warnings)
+│   │   ├── knowledge.py       # TileLang API knowledge base
+│   │   └── utils.py           # Shared helpers
+│   ├── tests/
+│   │   ├── conftest.py        # Shared test fixtures
+│   │   ├── test_knowledge.py
+│   │   ├── test_detection.py
+│   │   ├── test_completion.py
+│   │   ├── test_diagnostics.py
+│   │   ├── test_hover.py
+│   │   └── test_server_creation.py
+│   └── pyproject.toml
+└── tiled-vscode/              # VS Code extension (TypeScript)
+    ├── src/extension.ts       # Extension activation, launches tiled server
+    ├── snippets/tilelang.json
+    └── package.json
+```
 
 ## Development
 
