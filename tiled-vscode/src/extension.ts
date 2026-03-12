@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { execFileSync, execSync } from "child_process";
+import { execFileSync } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import {
@@ -10,7 +10,6 @@ import {
 } from "vscode-languageclient/node";
 
 let client: LanguageClient | undefined;
-const outputChannel = vscode.window.createOutputChannel("TileLang (tiled)");
 
 /**
  * Build a list of Python interpreter candidates to probe.
@@ -20,64 +19,75 @@ function pythonCandidates(configured: string): string[] {
     return [configured];
   }
 
-  const candidates: string[] = ["python", "python3"];
+  const seen = new Set<string>();
+  const candidates: string[] = [];
+  const add = (p: string) => {
+    if (!seen.has(p)) {
+      seen.add(p);
+      candidates.push(p);
+    }
+  };
 
-  // Conda – $CONDA_PREFIX/bin/python
+  // Conda – $CONDA_PREFIX/bin/python (most likely correct)
   const condaPrefix = process.env.CONDA_PREFIX;
   if (condaPrefix) {
-    candidates.push(path.join(condaPrefix, "bin", "python"));
+    add(path.join(condaPrefix, "bin", "python"));
   }
 
-  // Common conda base locations (macOS)
+  // Common conda / pyenv base locations
+  const home = process.env.HOME || "";
   for (const base of [
-    path.join(process.env.HOME || "", "miniconda3"),
-    path.join(process.env.HOME || "", "anaconda3"),
-    path.join(process.env.HOME || "", "miniforge3"),
+    path.join(home, "miniconda3"),
+    path.join(home, "anaconda3"),
+    path.join(home, "miniforge3"),
     "/opt/homebrew/Caskroom/miniconda/base",
   ]) {
     const p = path.join(base, "bin", "python");
     if (fs.existsSync(p)) {
-      candidates.push(p);
+      add(p);
     }
   }
 
-  // Try `which python` from a login shell to inherit full PATH
-  try {
-    const resolved = execSync("zsh -ilc 'which python' 2>/dev/null", {
-      timeout: 3000,
-      encoding: "utf-8",
-    }).trim();
-    if (resolved && !candidates.includes(resolved)) {
-      candidates.push(resolved);
-    }
-  } catch {
-    // ignore
-  }
+  // PATH-based fallbacks
+  add("python");
+  add("python3");
 
   return candidates;
 }
 
 /**
+ * Test if a Python interpreter has tiled_server installed.
+ */
+function hasTiledServer(py: string): boolean {
+  try {
+    execFileSync(py, ["-c", "import tiled_server"], {
+      timeout: 3000,
+      stdio: "ignore",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Find a Python interpreter that has tiled_server installed.
  */
-function findPython(configured: string): string | undefined {
+function findPython(
+  configured: string,
+  outputChannel: vscode.OutputChannel
+): string | undefined {
   const candidates = pythonCandidates(configured);
 
   for (const py of candidates) {
-    try {
-      execFileSync(py, ["-c", "import tiled_server"], {
-        timeout: 5000,
-        stdio: "ignore",
-      });
+    if (hasTiledServer(py)) {
       outputChannel.appendLine(`[tiled] Using Python: ${py}`);
       return py;
-    } catch {
-      // not available or tiled_server not installed
     }
   }
 
   outputChannel.appendLine(
-    `[tiled] Tried these Python interpreters: ${candidates.join(", ")}`
+    `[tiled] Could not find tiled_server. Tried: ${candidates.join(", ")}`
   );
   return undefined;
 }
@@ -85,6 +95,7 @@ function findPython(configured: string): string | undefined {
 export async function activate(
   context: vscode.ExtensionContext
 ): Promise<void> {
+  const outputChannel = vscode.window.createOutputChannel("TileLang (tiled)");
   const config = vscode.workspace.getConfiguration("tiled");
 
   if (!config.get<boolean>("enable", true)) {
@@ -104,7 +115,7 @@ export async function activate(
       transport: TransportKind.stdio,
     };
   } else {
-    const pythonPath = findPython(configuredPython);
+    const pythonPath = findPython(configuredPython, outputChannel);
     if (!pythonPath) {
       const msg =
         "tiled: Cannot find a Python with tiled_server installed. " +
