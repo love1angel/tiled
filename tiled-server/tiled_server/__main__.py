@@ -54,7 +54,6 @@ def _run_lsp(args):
 
 def _run_mcp(args):
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
-    try:
     from .mcp import mcp
     mcp.run(transport="stdio")
 
