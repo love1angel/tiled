@@ -16,6 +16,8 @@ Download the latest release from [GitHub Releases](https://github.com/love1angel
 pip install tile-lsp
 ```
 
+This installs the `tiled` command (the language server binary).
+
 Or from a downloaded wheel:
 
 ```bash
