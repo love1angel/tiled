@@ -198,47 +198,131 @@ def build_definition(
                         )
             break
 
-    # Try tilelang.xxx pattern
-    for m in re.finditer(r"\btilelang\.(\w+)", line):
-        sym_start, sym_end = m.start(1), m.end(1)
-        if sym_start <= position.character <= sym_end:
-            symbol_name = m.group(1)
-            module_file = _TOPLEVEL_MODULE.get(symbol_name)
-            if module_file:
-                root = _find_tilelang_root(workspace_folders)
-                if root:
-                    filepath = os.path.join(root, module_file)
-                    line_no = _find_def_in_file(filepath, symbol_name)
-                    if line_no is not None:
-                        uri = f"file://{filepath}"
-                        return lsp.Location(
-                            uri=uri,
-                            range=lsp.Range(
-                                start=lsp.Position(line=line_no, character=0),
-                                end=lsp.Position(line=line_no, character=0),
-                            ),
-                        )
-            break
-
-    # Try "from tilelang.xxx.yyy import Name" pattern
-    m_import = re.match(r"^from\s+(tilelang(?:\.\w+)*)\s+import\s+(.+)", line)
-    if m_import:
-        module_path = m_import.group(1)  # e.g. "tilelang.carver.arch"
-        imports_str = m_import.group(2)  # e.g. "CUDA" or "CUDA, CDNA"
-        # Find which imported name the cursor is on
-        for m_name in re.finditer(r"\b(\w+)\b", imports_str):
-            abs_start = m_import.start(2) + m_name.start(1)
-            abs_end = m_import.start(2) + m_name.end(1)
-            if abs_start <= position.character <= abs_end:
-                symbol_name = m_name.group(1)
-                root = _find_tilelang_root(workspace_folders)
-                if root:
-                    loc = _resolve_import(root, module_path, symbol_name)
-                    if loc:
-                        return loc
+    # Try tilelang.xxx pattern (in non-import expressions like @tilelang.jit)
+    if not line.lstrip().startswith(("from ", "import ")):
+        for m in re.finditer(r"\btilelang\.(\w+)", line):
+            sym_start, sym_end = m.start(1), m.end(1)
+            if sym_start <= position.character <= sym_end:
+                symbol_name = m.group(1)
+                module_file = _TOPLEVEL_MODULE.get(symbol_name)
+                if module_file:
+                    root = _find_tilelang_root(workspace_folders)
+                    if root:
+                        filepath = os.path.join(root, module_file)
+                        line_no = _find_def_in_file(filepath, symbol_name)
+                        if line_no is not None:
+                            uri = f"file://{filepath}"
+                            return lsp.Location(
+                                uri=uri,
+                                range=lsp.Range(
+                                    start=lsp.Position(line=line_no, character=0),
+                                    end=lsp.Position(line=line_no, character=0),
+                                ),
+                            )
                 break
 
+    # Handle import statements: from/import tilelang.xxx.yyy [as Z | import Name]
+    root = _find_tilelang_root(workspace_folders)
+    if root:
+        loc = _resolve_import_line(root, line, position.character)
+        if loc:
+            return loc
+
     return None
+
+
+def _resolve_module_path(root: str, module_path: str) -> Optional[lsp.Location]:
+    """Resolve a dotted module path to its __init__.py or .py file."""
+    parts = module_path.split(".")
+    rel_parts = parts[1:]  # drop "tilelang"
+    if not rel_parts:
+        # Just "tilelang" itself
+        filepath = os.path.join(root, "__init__.py")
+        if os.path.isfile(filepath):
+            return lsp.Location(
+                uri=f"file://{filepath}",
+                range=lsp.Range(
+                    start=lsp.Position(line=0, character=0),
+                    end=lsp.Position(line=0, character=0),
+                ),
+            )
+        return None
+
+    base = os.path.join(root, *rel_parts)
+    # Package directory
+    init = os.path.join(base, "__init__.py")
+    if os.path.isfile(init):
+        return lsp.Location(
+            uri=f"file://{init}",
+            range=lsp.Range(
+                start=lsp.Position(line=0, character=0),
+                end=lsp.Position(line=0, character=0),
+            ),
+        )
+    # Module file
+    mod_file = base + ".py"
+    if os.path.isfile(mod_file):
+        return lsp.Location(
+            uri=f"file://{mod_file}",
+            range=lsp.Range(
+                start=lsp.Position(line=0, character=0),
+                end=lsp.Position(line=0, character=0),
+            ),
+        )
+    return None
+
+
+def _resolve_import_line(
+    root: str, line: str, character: int
+) -> Optional[lsp.Location]:
+    """Handle all import-line definition lookups."""
+    # "from tilelang.xxx.yyy import Name1, Name2"
+    m_from = re.match(r"^from\s+(tilelang(?:\.\w+)*)\s+import\s+(.+)", line)
+    if m_from:
+        module_path = m_from.group(1)
+        imports_str = m_from.group(2)
+
+        # Check if cursor is on the module path
+        mod_start = m_from.start(1)
+        mod_end = m_from.end(1)
+        if mod_start <= character <= mod_end:
+            # Find which dotted segment the cursor is on
+            prefix = _dotted_prefix_at(module_path, character - mod_start)
+            return _resolve_module_path(root, prefix)
+
+        # Check if cursor is on an imported name
+        for m_name in re.finditer(r"\b(\w+)\b", imports_str):
+            abs_start = m_from.start(2) + m_name.start(1)
+            abs_end = m_from.start(2) + m_name.end(1)
+            if abs_start <= character <= abs_end:
+                symbol_name = m_name.group(1)
+                return _resolve_import(root, module_path, symbol_name)
+        return None
+
+    # "import tilelang.xxx.yyy [as Z]"
+    m_imp = re.match(r"^import\s+(tilelang(?:\.\w+)*)(?:\s+as\s+\w+)?", line)
+    if m_imp:
+        module_path = m_imp.group(1)
+        mod_start = m_imp.start(1)
+        mod_end = m_imp.end(1)
+        if mod_start <= character <= mod_end:
+            prefix = _dotted_prefix_at(module_path, character - mod_start)
+            return _resolve_module_path(root, prefix)
+
+    return None
+
+
+def _dotted_prefix_at(dotted: str, offset: int) -> str:
+    """Given 'tilelang.foo.bar' and an offset, return the prefix up to that segment."""
+    # Walk segments to find which one the offset falls in
+    pos = 0
+    parts = dotted.split(".")
+    for i, part in enumerate(parts):
+        seg_end = pos + len(part)
+        if offset <= seg_end:
+            return ".".join(parts[: i + 1])
+        pos = seg_end + 1  # skip the dot
+    return dotted
 
 
 def _resolve_import(
