@@ -30,6 +30,31 @@ code --install-extension vscode-tiled-0.1.0.vsix
 
 Or install the `.vsix` manually in VS Code: Extensions sidebar → `···` menu → "Install from VSIX..."
 
+**3. Configure (optional):**
+
+The extension works out of the box after installing `tile-lsp`. If needed, add these to your VS Code `settings.json`:
+
+```jsonc
+{
+  // Use a specific Python interpreter (e.g. a virtualenv where tile-lsp is installed)
+  "tiled.server.pythonPath": "/path/to/venv/bin/python3",
+
+  // Or point directly to the tiled binary
+  "tiled.server.path": "/path/to/venv/bin/tiled",
+
+  // Enable LSP trace for debugging
+  "tiled.trace.server": "verbose"
+}
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `tiled.enable` | `true` | Enable/disable the server |
+| `tiled.server.pythonPath` | `python3` | Python interpreter used to run the server |
+| `tiled.server.path` | `""` | Custom path to the `tiled` binary (bypasses `pythonPath`) |
+| `tiled.server.args` | `[]` | Extra arguments passed to the server |
+| `tiled.trace.server` | `off` | LSP trace level (`off`, `messages`, `verbose`) |
+
 ### From Source
 
 **Language Server:**
@@ -79,31 +104,6 @@ Type `T.` to get completions for all TileLang language constructs:
 | `tl-alloc-shared` | Shared memory allocation |
 | `tl-alloc-fragment` | Fragment allocation |
 | `tl-reduce-sum` | Sum reduction |
-
-### Configuration
-
-The extension works out of the box after installing `tile-lsp`. If needed, add these to your VS Code `settings.json`:
-
-```jsonc
-{
-  // Use a specific Python interpreter (e.g. a virtualenv where tile-lsp is installed)
-  "tiled.server.pythonPath": "/path/to/venv/bin/python3",
-
-  // Or point directly to the tiled binary
-  "tiled.server.path": "/path/to/venv/bin/tiled",
-
-  // Enable LSP trace for debugging
-  "tiled.trace.server": "verbose"
-}
-```
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `tiled.enable` | `true` | Enable/disable the server |
-| `tiled.server.pythonPath` | `python3` | Python interpreter used to run the server |
-| `tiled.server.path` | `""` | Custom path to the `tiled` binary (bypasses `pythonPath`) |
-| `tiled.server.args` | `[]` | Extra arguments passed to the server |
-| `tiled.trace.server` | `off` | LSP trace level (`off`, `messages`, `verbose`) |
 
 ## Features
 
