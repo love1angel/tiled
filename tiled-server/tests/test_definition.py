@@ -300,6 +300,38 @@ def bar():
         assert "tuner" in loc.uri
 
 
+# ── tilelang.xxx.yyy (top-level class + member) ────────────────────
+
+class TestTileLangDotClassMember:
+    """Go-to-definition for tilelang.TensorSupplyType.Normal etc."""
+
+    CODE = """\
+import tilelang
+
+profiler = fwd_kernel.get_profiler(tensor_supply_type=tilelang.TensorSupplyType.Normal)
+"""
+
+    def _pos(self, line_no: int, symbol: str):
+        idx = self.CODE.split("\n")[line_no].index(symbol)
+        return lsp.Position(line=line_no, character=idx + 2)
+
+    def test_tilelang_tensor_supply_type_class(self):
+        """Cursor on 'TensorSupplyType' in tilelang.TensorSupplyType.Normal."""
+        doc = _make_document(self.CODE)
+        loc = build_definition(doc, self._pos(2, "TensorSupplyType"), FOLDERS)
+        assert loc is not None
+        assert loc.uri.endswith("tensor.py")
+        _assert_line_contains(loc, "class TensorSupplyType")
+
+    def test_tilelang_tensor_supply_type_normal(self):
+        """Cursor on 'Normal' in tilelang.TensorSupplyType.Normal."""
+        doc = _make_document(self.CODE)
+        loc = build_definition(doc, self._pos(2, "Normal"), FOLDERS)
+        assert loc is not None
+        assert loc.uri.endswith("tensor.py")
+        _assert_line_contains(loc, "Normal")
+
+
 # ── Custom alias (import tilelang.language as TL) ───────────────────
 
 class TestCustomAlias:
