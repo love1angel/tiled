@@ -55,14 +55,7 @@ def _run_lsp(args):
 def _run_mcp(args):
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
     try:
-        from .mcp import mcp
-    except ImportError:
-        print(
-            "MCP dependencies not installed. Install with:\n"
-            "  pip install 'tile-lsp[mcp]'",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    from .mcp import mcp
     mcp.run(transport="stdio")
 
 
