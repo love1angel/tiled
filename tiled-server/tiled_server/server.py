@@ -13,6 +13,7 @@ except ImportError:
     from pygls.lsp.server import LanguageServer  # pygls < 2.0
 
 from .completion import build_completions, symbol_to_completion
+from .definition import build_definition
 from .detection import (
     _RE_IMPORT_T,
     _RE_IMPORT_TILELANG,
@@ -74,6 +75,12 @@ def create_server() -> LanguageServer:
     def hover(params: lsp.HoverParams) -> Optional[lsp.Hover]:
         doc = server.workspace.get_text_document(params.text_document.uri)
         return build_hover(doc, params.position)
+
+    @server.feature(lsp.TEXT_DOCUMENT_DEFINITION)
+    def definition(params: lsp.DefinitionParams) -> Optional[lsp.Location]:
+        doc = server.workspace.get_text_document(params.text_document.uri)
+        folders = server.workspace.folders.values() if server.workspace.folders else []
+        return build_definition(doc, params.position, list(folders))
 
     @server.feature(lsp.TEXT_DOCUMENT_SIGNATURE_HELP,
                     lsp.SignatureHelpOptions(trigger_characters=["(", ","]))
