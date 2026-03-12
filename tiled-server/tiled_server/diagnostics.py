@@ -8,6 +8,29 @@ from lsprotocol import types as lsp
 
 from .detection import is_tilelang_file
 
+_RE_TRIPLE_QUOTE = re.compile(r'("""|\'\'\')')
+
+
+def _string_lines(source: str) -> set[int]:
+    """Return the set of line numbers that fall inside triple-quoted strings."""
+    inside: set[int] = set()
+    in_string = False
+    quote_char = ""
+    for i, line in enumerate(source.split("\n")):
+        had_toggle = False
+        for m in _RE_TRIPLE_QUOTE.finditer(line):
+            if not in_string:
+                in_string = True
+                quote_char = m.group(1)
+                had_toggle = True
+            elif m.group(1) == quote_char:
+                in_string = False
+                had_toggle = True
+        # Mark opening, closing, and interior lines
+        if in_string or had_toggle:
+            inside.add(i)
+    return inside
+
 
 def compute_diagnostics(uri: str, source: str) -> list[lsp.Diagnostic]:
     """Run simple diagnostics on tilelang code."""
@@ -16,12 +39,15 @@ def compute_diagnostics(uri: str, source: str) -> list[lsp.Diagnostic]:
 
     diagnostics: list[lsp.Diagnostic] = []
     lines = source.split("\n")
+    skip = _string_lines(source)
 
     in_prim_func = False
     has_kernel = False
     prim_func_line = 0
 
     for i, line in enumerate(lines):
+        if i in skip:
+            continue
         stripped = line.strip()
 
         # Track @T.prim_func
