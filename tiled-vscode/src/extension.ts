@@ -176,7 +176,13 @@ export async function activate(
     })
   );
 
-  await client.start();
+  try {
+    await client.start();
+    outputChannel.appendLine("[tiled] Server started successfully.");
+  } catch (err) {
+    outputChannel.appendLine(`[tiled] Server failed to start: ${err}`);
+    outputChannel.show(true);
+  }
 }
 
 export async function deactivate(): Promise<void> {
