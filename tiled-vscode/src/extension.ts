@@ -22,11 +22,8 @@ export async function activate(
   const customServerPath = config.get<string>("server.path", "");
   const extraArgs = config.get<string[]>("server.args", []);
 
-  // ── Check if tile-lsp is installed ──
-  const installed = await checkServerInstalled(pythonPath, customServerPath);
-  if (!installed) {
-    return;
-  }
+  // ── Non-blocking check: warn if tile-lsp is missing, but don't block activation ──
+  checkServerInstalled(pythonPath, customServerPath);
 
   let serverOptions: ServerOptions;
 
@@ -260,47 +257,41 @@ except Exception as e:
 
 /**
  * Check if tile-lsp is installed and offer to install it if missing.
- * Similar to how clangd extension auto-downloads the language server.
+ * Non-blocking: activation continues regardless.
  */
-async function checkServerInstalled(
+function checkServerInstalled(
   pythonPath: string,
   customServerPath: string
-): Promise<boolean> {
-  // Skip check if using a custom server path
+): void {
   if (customServerPath) {
-    return true;
+    return;
   }
 
-  return new Promise<boolean>((resolve) => {
-    execFile(
-      pythonPath,
-      ["-c", "import tiled_server; print(tiled_server.__version__)"],
-      { timeout: 10000 },
-      async (error, stdout, _stderr) => {
-        if (!error && stdout.trim()) {
-          return resolve(true);
-        }
-
-        const install = "Install tile-lsp";
-        const dismiss = "Dismiss";
-        const choice = await vscode.window.showWarningMessage(
-          "TileLang language server (tile-lsp) is not installed. " +
-            "Install it to enable completions, hover docs, and diagnostics.",
-          install,
-          dismiss
-        );
-
-        if (choice === install) {
-          const terminal = vscode.window.createTerminal("tile-lsp install");
-          terminal.show();
-          terminal.sendText(`${pythonPath} -m pip install tile-lsp`);
-          vscode.window.showInformationMessage(
-            "Installing tile-lsp... Reload the window after installation completes."
-          );
-        }
-
-        resolve(false);
+  execFile(
+    pythonPath,
+    ["-c", "import tiled_server; print(tiled_server.__version__)"],
+    { timeout: 10000 },
+    async (error, stdout, _stderr) => {
+      if (!error && stdout.trim()) {
+        return;
       }
-    );
-  });
+
+      const install = "Install tile-lsp";
+      const choice = await vscode.window.showWarningMessage(
+        "TileLang language server (tile-lsp) is not installed. " +
+          "Install it to enable completions, hover docs, and diagnostics.",
+        install,
+        "Dismiss"
+      );
+
+      if (choice === install) {
+        const terminal = vscode.window.createTerminal("tile-lsp install");
+        terminal.show();
+        terminal.sendText(`${pythonPath} -m pip install tile-lsp`);
+        vscode.window.showInformationMessage(
+          "Installing tile-lsp... Reload the window after installation completes."
+        );
+      }
+    }
+  );
 }
