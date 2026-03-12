@@ -22,17 +22,21 @@ export async function activate(
   const customServerPath = config.get<string>("server.path", "");
   const extraArgs = config.get<string[]>("server.args", []);
 
+  // ── Check if tile-lsp is installed ──
+  const installed = await checkServerInstalled(pythonPath, customServerPath);
+  if (!installed) {
+    return;
+  }
+
   let serverOptions: ServerOptions;
 
   if (customServerPath) {
-    // Use custom server binary path
     serverOptions = {
       command: customServerPath,
       args: extraArgs,
       transport: TransportKind.stdio,
     };
   } else {
-    // Use python -m tiled_server (works if tiled-lsp is pip-installed)
     serverOptions = {
       command: pythonPath,
       args: ["-m", "tiled_server", ...extraArgs],
@@ -127,53 +131,25 @@ function isTileLangFile(document: vscode.TextDocument): boolean {
 }
 
 /**
- * Run auto_optimize on the active file (static analysis, no GPU needed).
- * Detects bugs, adds annotations, optimizes loops — all via code pattern matching.
+ * Run kernel analysis via Copilot's analyze_kernel MCP tool.
+ * The old auto_optimize function was removed; analysis now requires tilelang + GPU.
  */
-function runStaticOptimize(pythonPath: string): void {
+async function runStaticOptimize(_pythonPath: string): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
     vscode.window.showWarningMessage("No active editor.");
     return;
   }
 
-  const doc = editor.document;
-  if (!isTileLangFile(doc)) {
+  if (!isTileLangFile(editor.document)) {
     vscode.window.showWarningMessage("Current file is not a TileLang kernel.");
     return;
   }
 
-  const code = doc.getText();
-  const channel = vscode.window.createOutputChannel("TileLang Optimization");
-  channel.show();
-  channel.appendLine("Running auto_optimize (static analysis, no GPU required)...\n");
-
-  const script = `
-import json, sys
-try:
-    from tilelang_mcp.server import auto_optimize
-    result = auto_optimize(code=json.loads(sys.argv[1]))
-    print(result)
-except ImportError:
-    print("Error: tilelang-mcp is not installed.", file=sys.stderr)
-    print("Install it with: pip install git+https://github.com/tile-ai/tilelang-mcp.git", file=sys.stderr)
-    sys.exit(1)
-except Exception as e:
-    print(f"Error: {e}", file=sys.stderr)
-    sys.exit(1)
-`;
-
-  execFile(
-    pythonPath,
-    ["-c", script, JSON.stringify(code)],
-    { maxBuffer: 1024 * 1024 },
-    (error, stdout, stderr) => {
-      if (error) {
-        channel.appendLine(`Error: ${stderr || error.message}`);
-        return;
-      }
-      channel.appendLine(stdout);
-    }
+  const fileName = editor.document.fileName.split("/").pop();
+  await vscode.commands.executeCommand(
+    "workbench.action.chat.open",
+    { query: `Use the analyze_kernel tool to analyze and optimize the kernel in ${fileName}` }
   );
 }
 
@@ -207,10 +183,9 @@ async function showBenchmarkOptions(): Promise<void> {
       { query: `Use the compile_and_benchmark tool to benchmark the kernel in ${fileName}` }
     );
   } else if (choice === "Copy CI Command") {
-    const filePath = vscode.workspace.asRelativePath(editor.document.uri);
-    const cmd = `tilelang-mcp ci ${filePath}`;
+    const cmd = `tiled mcp`;
     await vscode.env.clipboard.writeText(cmd);
-    vscode.window.showInformationMessage(`Copied to clipboard: ${cmd}`);
+    vscode.window.showInformationMessage(`Copied MCP server command to clipboard: ${cmd}`);
   }
 }
 
@@ -238,9 +213,16 @@ async function pickAndGenerateTemplate(pythonPath: string): Promise<void> {
   const script = `
 import sys
 try:
-    from tilelang_mcp.server import generate_kernel
-    result = generate_kernel(template_name=sys.argv[1])
-    print(result)
+    from tiled_server.knowledge import get_template
+    result = get_template(sys.argv[1])
+    if result is None:
+        print(f"Error: Unknown template '{sys.argv[1]}'", file=sys.stderr)
+        sys.exit(1)
+    print(result["code"])
+except ImportError:
+    print("Error: tile-lsp is not installed.", file=sys.stderr)
+    print("Install it with: pip install tile-lsp", file=sys.stderr)
+    sys.exit(1)
 except Exception as e:
     print(f"Error: {e}", file=sys.stderr)
     sys.exit(1)
@@ -256,9 +238,7 @@ except Exception as e:
         return;
       }
 
-      // Extract code block from markdown output
-      const codeMatch = stdout.match(/```python\n([\s\S]*?)```/);
-      const code = codeMatch ? codeMatch[1] : stdout;
+      const code = stdout;
 
       const editor = vscode.window.activeTextEditor;
       if (editor) {
@@ -274,4 +254,53 @@ except Exception as e:
       }
     }
   );
+}
+
+// ── Dependency auto-detection ─────────────────────────────────────────
+
+/**
+ * Check if tile-lsp is installed and offer to install it if missing.
+ * Similar to how clangd extension auto-downloads the language server.
+ */
+async function checkServerInstalled(
+  pythonPath: string,
+  customServerPath: string
+): Promise<boolean> {
+  // Skip check if using a custom server path
+  if (customServerPath) {
+    return true;
+  }
+
+  return new Promise<boolean>((resolve) => {
+    execFile(
+      pythonPath,
+      ["-c", "import tiled_server; print(tiled_server.__version__)"],
+      { timeout: 10000 },
+      async (error, stdout, _stderr) => {
+        if (!error && stdout.trim()) {
+          return resolve(true);
+        }
+
+        const install = "Install tile-lsp";
+        const dismiss = "Dismiss";
+        const choice = await vscode.window.showWarningMessage(
+          "TileLang language server (tile-lsp) is not installed. " +
+            "Install it to enable completions, hover docs, and diagnostics.",
+          install,
+          dismiss
+        );
+
+        if (choice === install) {
+          const terminal = vscode.window.createTerminal("tile-lsp install");
+          terminal.show();
+          terminal.sendText(`${pythonPath} -m pip install tile-lsp`);
+          vscode.window.showInformationMessage(
+            "Installing tile-lsp... Reload the window after installation completes."
+          );
+        }
+
+        resolve(false);
+      }
+    );
+  });
 }

@@ -53,8 +53,8 @@
     "mcpServers": {
       "tilelang-mcp": {
         "type": "stdio",
-        "command": "tilelang-mcp",
-        "args": ["serve"]
+        "command": "tiled",
+        "args": ["mcp"]
       }
     },
     "configuration": {
