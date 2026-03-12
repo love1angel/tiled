@@ -162,6 +162,8 @@ The MCP server provides 9 tools and 4 resources for AI agents (GitHub Copilot, C
 
 The extension registers the MCP server automatically. To configure it manually for your workspace, create `.vscode/mcp.json`:
 
+**Local (MCP server runs on the same machine):**
+
 ```json
 {
   "servers": {
@@ -176,8 +178,27 @@ The extension registers the MCP server automatically. To configure it manually f
 
 > **Tip**: If VS Code can't find `tiled`, use the full path (e.g. `/path/to/venv/bin/tiled`).
 
+**Remote (MCP server runs on a GPU machine via SSH):**
+
+```json
+{
+  "servers": {
+    "tilelang-mcp": {
+      "type": "stdio",
+      "command": "ssh",
+      "args": ["user@gpu-host", "tiled", "mcp"]
+    }
+  }
+}
+```
+
+> This lets you write kernels on a laptop and compile/benchmark on a remote GPU server. Make sure `tiled` and `tilelang` are installed on the remote machine.
+
 Once the MCP server is running, use natural language in Copilot Chat (Agent mode):
 
+- "TileLang 有哪些 API" → calls `list_apis`
+- "T.Pipelined 怎么用" → calls `lookup_api`
+- "给我一个 flash attention 模板" → calls `get_templates`
 - "帮我 benchmark 这个 kernel" → calls `compile_and_benchmark`
 - "分析这个 kernel 的性能瓶颈" → calls `analyze_kernel`
 - "搜索 flash attention 的示例" → calls `search_examples`
