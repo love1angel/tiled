@@ -25,6 +25,18 @@ def _make_document(source: str):
     return doc
 
 
+def _assert_line_contains(loc: lsp.Location, expected: str):
+    """Assert the resolved line in the target file contains *expected*."""
+    filepath = loc.uri.replace("file://", "")
+    with open(filepath) as fh:
+        lines = fh.readlines()
+    line_no = loc.range.start.line
+    assert 0 <= line_no < len(lines), f"line {line_no} out of range"
+    assert expected in lines[line_no], (
+        f"expected {expected!r} at line {line_no}, got: {lines[line_no]!r}"
+    )
+
+
 # Skip all tests if tilelang source tree is not available
 pytestmark = pytest.mark.skipif(
     not os.path.isdir(os.path.join(TILELANG_ROOT, "tilelang", "language")),
@@ -49,39 +61,38 @@ T.copy(src, dst)
 T.clear(buf)
 """
 
+    def _pos(self, line_no: int, symbol: str):
+        """Return a Position with character pointing inside *symbol* on *line_no*."""
+        idx = self.CODE.split("\n")[line_no].index(symbol)
+        return lsp.Position(line=line_no, character=idx + 1)
+
     def test_t_alloc_shared(self):
         doc = _make_document(self.CODE)
-        # "T.alloc_shared" — cursor on 'alloc_shared'
-        pos = lsp.Position(line=2, character=8)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(2, "alloc_shared"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("allocate.py")
 
     def test_t_gemm(self):
         doc = _make_document(self.CODE)
-        pos = lsp.Position(line=3, character=4)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(3, "gemm"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("gemm_op.py")
 
     def test_t_kernel(self):
         doc = _make_document(self.CODE)
-        pos = lsp.Position(line=4, character=4)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(4, "Kernel"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("kernel.py")
 
     def test_t_copy(self):
         doc = _make_document(self.CODE)
-        pos = lsp.Position(line=5, character=4)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(5, "copy"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("copy_op.py")
 
     def test_t_clear(self):
         doc = _make_document(self.CODE)
-        pos = lsp.Position(line=6, character=4)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(6, "clear"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("fill_op.py")
 
@@ -100,59 +111,46 @@ T.gemm(A, B, C, policy=T.GemmWarpPolicy.Square)
 x = T.GemmWarpPolicy.FullRow
 """
 
+    def _pos(self, line_no: int, symbol: str):
+        idx = self.CODE.split("\n")[line_no].index(symbol)
+        return lsp.Position(line=line_no, character=idx + 2)
+
     def test_t_gemm_warp_policy_class(self):
         """Cursor on 'GemmWarpPolicy' in T.GemmWarpPolicy.FullRow."""
         doc = _make_document(self.CODE)
-        # line 2: "T.gemm(A, B, C, policy=T.GemmWarpPolicy.FullRow)"
-        # Find "GemmWarpPolicy" start — after "policy=T."
-        idx = self.CODE.split("\n")[2].index("GemmWarpPolicy")
-        pos = lsp.Position(line=2, character=idx + 2)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(2, "GemmWarpPolicy"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("base.py")
-        # Should point to the class definition line
-        assert loc.range.start.line == 4  # class GemmWarpPolicy(IntEnum):
+        _assert_line_contains(loc, "class GemmWarpPolicy")
 
     def test_t_gemm_warp_policy_fullrow(self):
         """Cursor on 'FullRow' in T.GemmWarpPolicy.FullRow."""
         doc = _make_document(self.CODE)
-        line_text = self.CODE.split("\n")[2]
-        idx = line_text.index("FullRow")
-        pos = lsp.Position(line=2, character=idx + 2)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(2, "FullRow"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("base.py")
-        assert loc.range.start.line == 10  # FullRow = 1
+        _assert_line_contains(loc, "FullRow")
 
     def test_t_gemm_warp_policy_fullcol(self):
         """Cursor on 'FullCol' in T.GemmWarpPolicy.FullCol."""
         doc = _make_document(self.CODE)
-        line_text = self.CODE.split("\n")[3]
-        idx = line_text.index("FullCol")
-        pos = lsp.Position(line=3, character=idx + 2)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(3, "FullCol"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("base.py")
-        assert loc.range.start.line == 11  # FullCol = 2
+        _assert_line_contains(loc, "FullCol")
 
     def test_t_gemm_warp_policy_square(self):
         """Cursor on 'Square' in T.GemmWarpPolicy.Square."""
         doc = _make_document(self.CODE)
-        line_text = self.CODE.split("\n")[4]
-        idx = line_text.index("Square")
-        pos = lsp.Position(line=4, character=idx + 2)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(4, "Square"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("base.py")
-        assert loc.range.start.line == 9  # Square = 0
+        _assert_line_contains(loc, "Square")
 
     def test_t_gemm_warp_policy_standalone_line(self):
         """Cursor on GemmWarpPolicy in x = T.GemmWarpPolicy.FullRow."""
         doc = _make_document(self.CODE)
-        line_text = self.CODE.split("\n")[5]
-        idx = line_text.index("GemmWarpPolicy")
-        pos = lsp.Position(line=5, character=idx + 2)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(5, "GemmWarpPolicy"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("base.py")
 
@@ -170,35 +168,30 @@ T.gemm(A, B, C, policy=GemmWarpPolicy.FullRow)
 x = GemmWarpPolicy.Square
 """
 
+    def _pos(self, line_no: int, symbol: str):
+        idx = self.CODE.split("\n")[line_no].index(symbol)
+        return lsp.Position(line=line_no, character=idx + 2)
+
     def test_bare_gemm_warp_policy_class(self):
         doc = _make_document(self.CODE)
-        line_text = self.CODE.split("\n")[3]
-        idx = line_text.index("GemmWarpPolicy")
-        pos = lsp.Position(line=3, character=idx + 2)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(3, "GemmWarpPolicy"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("base.py")
-        assert loc.range.start.line == 4
+        _assert_line_contains(loc, "class GemmWarpPolicy")
 
     def test_bare_gemm_warp_policy_fullrow(self):
         doc = _make_document(self.CODE)
-        line_text = self.CODE.split("\n")[3]
-        idx = line_text.index("FullRow")
-        pos = lsp.Position(line=3, character=idx + 2)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(3, "FullRow"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("base.py")
-        assert loc.range.start.line == 10
+        _assert_line_contains(loc, "FullRow")
 
     def test_bare_gemm_warp_policy_square(self):
         doc = _make_document(self.CODE)
-        line_text = self.CODE.split("\n")[4]
-        idx = line_text.index("Square")
-        pos = lsp.Position(line=4, character=idx + 2)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(4, "Square"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("base.py")
-        assert loc.range.start.line == 9
+        _assert_line_contains(loc, "Square")
 
 
 # ── Import line resolution ──────────────────────────────────────────
@@ -212,32 +205,31 @@ from tilelang.tileop.base import GemmWarpPolicy
 import tilelang
 """
 
+    def _pos(self, line_no: int, symbol: str):
+        idx = self.CODE.split("\n")[line_no].index(symbol)
+        return lsp.Position(line=line_no, character=idx + 2)
+
     def test_import_tilelang_language_module(self):
         """Cursor on 'language' in 'import tilelang.language as T'."""
         doc = _make_document(self.CODE)
-        pos = lsp.Position(line=0, character=18)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(0, "language"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("language/__init__.py")
 
     def test_from_import_module_path(self):
         """Cursor on 'tileop' in 'from tilelang.tileop.base import ...'."""
         doc = _make_document(self.CODE)
-        pos = lsp.Position(line=1, character=18)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(1, "tileop"), FOLDERS)
         assert loc is not None
         assert "tileop" in loc.uri
 
     def test_from_import_symbol_name(self):
         """Cursor on 'GemmWarpPolicy' in 'from ... import GemmWarpPolicy'."""
         doc = _make_document(self.CODE)
-        line_text = self.CODE.split("\n")[1]
-        idx = line_text.index("GemmWarpPolicy")
-        pos = lsp.Position(line=1, character=idx + 2)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(1, "GemmWarpPolicy"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("base.py")
-        assert loc.range.start.line == 4
+        _assert_line_contains(loc, "class GemmWarpPolicy")
 
 
 # ── Non-tilelang files should return None ───────────────────────────
@@ -271,17 +263,19 @@ def bar():
     pass
 """
 
+    def _pos(self, line_no: int, symbol: str):
+        idx = self.CODE.split("\n")[line_no].index(symbol)
+        return lsp.Position(line=line_no, character=idx + 1)
+
     def test_tilelang_jit(self):
         doc = _make_document(self.CODE)
-        pos = lsp.Position(line=3, character=12)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(3, "jit"), FOLDERS)
         assert loc is not None
         assert "jit" in loc.uri
 
     def test_tilelang_autotune(self):
         doc = _make_document(self.CODE)
-        pos = lsp.Position(line=7, character=12)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(7, "autotune"), FOLDERS)
         assert loc is not None
         assert "tuner" in loc.uri
 
@@ -299,36 +293,32 @@ TL.gemm(A, B, C)
 TL.gemm(A, B, C, policy=TL.GemmWarpPolicy.FullRow)
 """
 
+    def _pos(self, code: str, line_no: int, symbol: str):
+        idx = code.split("\n")[line_no].index(symbol)
+        return lsp.Position(line=line_no, character=idx + 2)
+
     def test_tl_alloc_shared(self):
         doc = _make_document(self.CODE_TL)
-        pos = lsp.Position(line=2, character=9)  # cursor on 'alloc_shared'
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(self.CODE_TL, 2, "alloc_shared"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("allocate.py")
 
     def test_tl_gemm(self):
         doc = _make_document(self.CODE_TL)
-        pos = lsp.Position(line=3, character=5)  # cursor on 'gemm'
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(self.CODE_TL, 3, "gemm"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("gemm_op.py")
 
     def test_tl_gemm_warp_policy_fullrow(self):
         doc = _make_document(self.CODE_TL)
-        line_text = self.CODE_TL.split("\n")[4]
-        idx = line_text.index("FullRow")
-        pos = lsp.Position(line=4, character=idx + 2)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(self.CODE_TL, 4, "FullRow"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("base.py")
-        assert loc.range.start.line == 10
+        _assert_line_contains(loc, "FullRow")
 
     def test_tl_gemm_warp_policy_class(self):
         doc = _make_document(self.CODE_TL)
-        line_text = self.CODE_TL.split("\n")[4]
-        idx = line_text.index("GemmWarpPolicy")
-        pos = lsp.Position(line=4, character=idx + 2)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(self.CODE_TL, 4, "GemmWarpPolicy"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("base.py")
 
@@ -341,20 +331,16 @@ lang.GemmWarpPolicy.Square
 
     def test_lang_copy(self):
         doc = _make_document(self.CODE_LANG)
-        pos = lsp.Position(line=2, character=7)  # cursor on 'copy'
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(self.CODE_LANG, 2, "copy"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("copy_op.py")
 
     def test_lang_gemm_warp_policy_square(self):
         doc = _make_document(self.CODE_LANG)
-        line_text = self.CODE_LANG.split("\n")[3]
-        idx = line_text.index("Square")
-        pos = lsp.Position(line=3, character=idx + 2)
-        loc = build_definition(doc, pos, FOLDERS)
+        loc = build_definition(doc, self._pos(self.CODE_LANG, 3, "Square"), FOLDERS)
         assert loc is not None
         assert loc.uri.endswith("base.py")
-        assert loc.range.start.line == 9
+        _assert_line_contains(loc, "Square")
 
     CODE_NO_ALIAS = """\
 import tilelang
