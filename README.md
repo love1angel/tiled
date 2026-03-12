@@ -51,7 +51,13 @@ Download the latest release from [GitHub Releases](https://github.com/love1angel
 **1. Install the language server:**
 
 ```bash
-pip install tiled_lsp-0.1.0-py3-none-any.whl
+pip install tile-lsp
+```
+
+Or from a downloaded wheel:
+
+```bash
+pip install tile_lsp-0.1.0-py3-none-any.whl
 ```
 
 **2. Install the VS Code extension:**
