@@ -299,24 +299,28 @@ def build_definition(
                             )
                 break
 
-    # Try tilelang.xxx.yyy pattern (e.g. tilelang.TensorSupplyType.Normal)
+    # Try tilelang.xxx.yyy pattern (e.g. tilelang.TensorSupplyType.Normal
+    # or tilelang.testing.main)
     if not line.lstrip().startswith(("from ", "import ")):
         for m in re.finditer(r"\btilelang\.(\w+)\.(\w+)", line):
             full_start = m.start(1)
             full_end = m.end(2)
             if full_start <= position.character <= full_end:
-                class_name = m.group(1)
-                member_name = m.group(2)
+                first = m.group(1)
+                second = m.group(2)
                 on_member = position.character >= m.start(2)
-                module_file = _TOPLEVEL_MODULE.get(class_name)
                 root = _find_tilelang_root(workspace_folders)
-                if root and module_file:
+                if not root:
+                    break
+                # 1. Check _TOPLEVEL_MODULE (class-level, e.g. TensorSupplyType)
+                module_file = _TOPLEVEL_MODULE.get(first)
+                if module_file:
                     filepath = os.path.join(root, module_file)
-                    class_line = _find_def_in_file(filepath, class_name)
+                    class_line = _find_def_in_file(filepath, first)
                     if class_line is not None:
                         uri = f"file://{filepath}"
                         if on_member:
-                            member_line = _find_member_in_file(filepath, member_name)
+                            member_line = _find_member_in_file(filepath, second)
                             if member_line is not None:
                                 return lsp.Location(
                                     uri=uri,
@@ -332,6 +336,21 @@ def build_definition(
                                 end=lsp.Position(line=class_line, character=0),
                             ),
                         )
+                # 2. Try as submodule (e.g. tilelang.testing.main)
+                loc = _resolve_module_path(root, f"tilelang.{first}")
+                if loc:
+                    if on_member:
+                        filepath = loc.uri.replace("file://", "")
+                        member_line = _find_def_in_file(filepath, second)
+                        if member_line is not None:
+                            return lsp.Location(
+                                uri=loc.uri,
+                                range=lsp.Range(
+                                    start=lsp.Position(line=member_line, character=0),
+                                    end=lsp.Position(line=member_line, character=0),
+                                ),
+                            )
+                    return loc
                 break
 
     # Try tilelang.xxx pattern (in non-import expressions like @tilelang.jit)

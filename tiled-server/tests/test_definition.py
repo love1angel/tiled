@@ -342,6 +342,33 @@ profiler = fwd_kernel.get_profiler(tensor_supply_type=tilelang.TensorSupplyType.
         assert loc.uri.endswith("tensor.py")
         _assert_line_contains(loc, "Normal")
 
+    CODE_SUBMODULE = """\
+import tilelang
+
+tilelang.testing.main()
+"""
+
+    def test_tilelang_submodule(self):
+        """Cursor on 'testing' in tilelang.testing.main()."""
+        doc = _make_document(self.CODE_SUBMODULE)
+        line = self.CODE_SUBMODULE.split("\n")[2]
+        idx = line.index("testing")
+        pos = lsp.Position(line=2, character=idx + 2)
+        loc = build_definition(doc, pos, FOLDERS)
+        assert loc is not None
+        assert "testing" in loc.uri
+
+    def test_tilelang_submodule_func(self):
+        """Cursor on 'main' in tilelang.testing.main()."""
+        doc = _make_document(self.CODE_SUBMODULE)
+        line = self.CODE_SUBMODULE.split("\n")[2]
+        idx = line.index("main")
+        pos = lsp.Position(line=2, character=idx + 2)
+        loc = build_definition(doc, pos, FOLDERS)
+        assert loc is not None
+        assert "testing" in loc.uri
+        _assert_line_contains(loc, "def main")
+
 
 # ── Custom alias (import tilelang.language as TL) ───────────────────
 
