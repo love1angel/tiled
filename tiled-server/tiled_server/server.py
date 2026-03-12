@@ -45,19 +45,19 @@ def create_server() -> LanguageServer:
     def did_open(params: lsp.DidOpenTextDocumentParams):
         doc = server.workspace.get_text_document(params.text_document.uri)
         diagnostics = compute_diagnostics(doc.uri, doc.source)
-        server.publish_diagnostics(doc.uri, diagnostics)
+        server.text_document_publish_diagnostics(lsp.PublishDiagnosticsParams(uri=doc.uri, diagnostics=diagnostics))
 
     @server.feature(lsp.TEXT_DOCUMENT_DID_SAVE)
     def did_save(params: lsp.DidSaveTextDocumentParams):
         doc = server.workspace.get_text_document(params.text_document.uri)
         diagnostics = compute_diagnostics(doc.uri, doc.source)
-        server.publish_diagnostics(doc.uri, diagnostics)
+        server.text_document_publish_diagnostics(lsp.PublishDiagnosticsParams(uri=doc.uri, diagnostics=diagnostics))
 
     @server.feature(lsp.TEXT_DOCUMENT_DID_CHANGE)
     def did_change(params: lsp.DidChangeTextDocumentParams):
         doc = server.workspace.get_text_document(params.text_document.uri)
         diagnostics = compute_diagnostics(doc.uri, doc.source)
-        server.publish_diagnostics(doc.uri, diagnostics)
+        server.text_document_publish_diagnostics(lsp.PublishDiagnosticsParams(uri=doc.uri, diagnostics=diagnostics))
 
     @server.feature(
         lsp.TEXT_DOCUMENT_COMPLETION,
