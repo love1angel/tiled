@@ -1,6 +1,6 @@
 {
   "name": "vscode-tiled",
-  "displayName": "tiled",
+  "displayName": "tiled (TileLang)",
   "description": "Language support for TileLang DSL — completions, hover docs, diagnostics, and snippets",
   "version": "0.1.0",
   "publisher": "tile-ai",
