@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
-import { execFileSync } from "child_process";
+import { execFileSync, execSync } from "child_process";
+import * as path from "path";
+import * as fs from "fs";
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -11,13 +13,55 @@ let client: LanguageClient | undefined;
 const outputChannel = vscode.window.createOutputChannel("TileLang (tiled)");
 
 /**
+ * Build a list of Python interpreter candidates to probe.
+ */
+function pythonCandidates(configured: string): string[] {
+  if (configured) {
+    return [configured];
+  }
+
+  const candidates: string[] = ["python", "python3"];
+
+  // Conda – $CONDA_PREFIX/bin/python
+  const condaPrefix = process.env.CONDA_PREFIX;
+  if (condaPrefix) {
+    candidates.push(path.join(condaPrefix, "bin", "python"));
+  }
+
+  // Common conda base locations (macOS)
+  for (const base of [
+    path.join(process.env.HOME || "", "miniconda3"),
+    path.join(process.env.HOME || "", "anaconda3"),
+    path.join(process.env.HOME || "", "miniforge3"),
+    "/opt/homebrew/Caskroom/miniconda/base",
+  ]) {
+    const p = path.join(base, "bin", "python");
+    if (fs.existsSync(p)) {
+      candidates.push(p);
+    }
+  }
+
+  // Try `which python` from a login shell to inherit full PATH
+  try {
+    const resolved = execSync("zsh -ilc 'which python' 2>/dev/null", {
+      timeout: 3000,
+      encoding: "utf-8",
+    }).trim();
+    if (resolved && !candidates.includes(resolved)) {
+      candidates.push(resolved);
+    }
+  } catch {
+    // ignore
+  }
+
+  return candidates;
+}
+
+/**
  * Find a Python interpreter that has tiled_server installed.
- * Priority: user-configured > python (conda/venv) > python3 > which tiled.
  */
 function findPython(configured: string): string | undefined {
-  const candidates = configured
-    ? [configured]
-    : ["python", "python3"];
+  const candidates = pythonCandidates(configured);
 
   for (const py of candidates) {
     try {
@@ -31,6 +75,10 @@ function findPython(configured: string): string | undefined {
       // not available or tiled_server not installed
     }
   }
+
+  outputChannel.appendLine(
+    `[tiled] Tried these Python interpreters: ${candidates.join(", ")}`
+  );
   return undefined;
 }
 
