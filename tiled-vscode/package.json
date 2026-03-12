@@ -1,8 +1,8 @@
 {
   "name": "vscode-tiled",
   "displayName": "tiled (TileLang)",
-  "description": "Language support for TileLang DSL — completions, hover docs, diagnostics, and snippets",
-  "version": "1.2.1",
+  "description": "Language support for TileLang DSL — completions, hover docs, diagnostics, snippets, and AI-powered kernel optimization",
+  "version": "1.3.0",
   "publisher": "tile-ai",
   "license": "MIT",
   "repository": {
@@ -10,12 +10,13 @@
     "url": "https://github.com/love1angel/tiled.git"
   },
   "engines": {
-    "vscode": "^1.82.0"
+    "vscode": "^1.99.0"
   },
   "categories": [
     "Programming Languages",
     "Linters",
-    "Snippets"
+    "Snippets",
+    "Machine Learning"
   ],
   "keywords": [
     "tilelang",
@@ -23,13 +24,39 @@
     "gpu",
     "cuda",
     "kernel",
-    "dsl"
+    "dsl",
+    "mcp"
   ],
   "activationEvents": [
     "onLanguage:python"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "tiled.restart",
+        "title": "TileLang: Restart Language Server"
+      },
+      {
+        "command": "tiled.optimizeKernel",
+        "title": "TileLang: Optimize Current Kernel"
+      },
+      {
+        "command": "tiled.generateKernel",
+        "title": "TileLang: Generate Kernel from Template"
+      },
+      {
+        "command": "tiled.benchmarkKernel",
+        "title": "TileLang: Benchmark Current Kernel"
+      }
+    ],
+    "mcpServers": {
+      "tilelang-mcp": {
+        "type": "stdio",
+        "command": "tilelang-mcp",
+        "args": ["serve"]
+      }
+    },
     "configuration": {
       "title": "TileLang (tiled)",
       "properties": {
@@ -65,6 +92,11 @@
           "type": "boolean",
           "default": true,
           "description": "Enable/disable the tiled language server."
+        },
+        "tiled.mcp.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable MCP server integration for AI-powered kernel optimization."
         }
       }
     },

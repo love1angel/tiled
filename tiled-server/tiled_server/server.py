@@ -88,6 +88,43 @@ def create_server() -> LanguageServer:
         doc = server.workspace.get_text_document(params.text_document.uri)
         return build_signature_help(doc, params.position)
 
+    # ── Code Actions (diagnostic → AI fix suggestions) ────────────────
+
+    # Diagnostic codes that can be auto-fixed by MCP auto_optimize
+    _FIXABLE_CODES = {"missing-clear", "deprecated-alloc-buffer", "alloc-outside-kernel", "missing-dtype"}
+
+    @server.feature(
+        lsp.TEXT_DOCUMENT_CODE_ACTION,
+        lsp.CodeActionOptions(
+            code_action_kinds=[lsp.CodeActionKind.QuickFix],
+        ),
+    )
+    def code_action(params: lsp.CodeActionParams) -> list[lsp.CodeAction]:
+        actions: list[lsp.CodeAction] = []
+        has_fixable = False
+
+        for diag in params.context.diagnostics:
+            if diag.source != "tiled":
+                continue
+            code = diag.code if isinstance(diag.code, str) else ""
+            if code in _FIXABLE_CODES:
+                has_fixable = True
+
+        if has_fixable:
+            actions.append(lsp.CodeAction(
+                title="TileLang: Optimize kernel with AI (auto_optimize)",
+                kind=lsp.CodeActionKind.QuickFix,
+                diagnostics=[d for d in params.context.diagnostics
+                             if d.source == "tiled"
+                             and (isinstance(d.code, str) and d.code in _FIXABLE_CODES)],
+                command=lsp.Command(
+                    title="Optimize kernel",
+                    command="tiled.optimizeKernel",
+                ),
+            ))
+
+        return actions
+
     @server.feature(lsp.INITIALIZE)
     def initialize(params: lsp.InitializeParams) -> None:
         logger.info("tiled language server initialized")

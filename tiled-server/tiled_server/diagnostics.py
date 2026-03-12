@@ -84,6 +84,7 @@ def compute_diagnostics(uri: str, source: str) -> list[lsp.Diagnostic]:
                 message="T.alloc_shared should be used inside a @T.prim_func with T.Kernel context.",
                 severity=lsp.DiagnosticSeverity.Warning,
                 source="tiled",
+                code="alloc-outside-kernel",
             ))
 
         # 2. Deprecated or suspicious patterns
@@ -96,6 +97,7 @@ def compute_diagnostics(uri: str, source: str) -> list[lsp.Diagnostic]:
                 message="Consider using T.alloc_shared, T.alloc_fragment, or T.alloc_local instead of T.alloc_buffer for clarity.",
                 severity=lsp.DiagnosticSeverity.Hint,
                 source="tiled",
+                code="deprecated-alloc-buffer",
             ))
 
         # 3. Missing dtype in Tensor annotation
@@ -109,6 +111,7 @@ def compute_diagnostics(uri: str, source: str) -> list[lsp.Diagnostic]:
                 message="T.Tensor requires a dtype parameter: T.Tensor(shape, dtype)",
                 severity=lsp.DiagnosticSeverity.Warning,
                 source="tiled",
+                code="missing-dtype",
             ))
 
         # 4. gemm without clear
@@ -129,6 +132,7 @@ def compute_diagnostics(uri: str, source: str) -> list[lsp.Diagnostic]:
                     message="T.gemm accumulates into the output buffer. Make sure to T.clear() the accumulator first.",
                     severity=lsp.DiagnosticSeverity.Information,
                     source="tiled",
+                    code="missing-clear",
                 ))
 
         # Reset tracking at function boundaries
