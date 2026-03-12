@@ -40,8 +40,8 @@
         },
         "tiled.server.pythonPath": {
           "type": "string",
-          "default": "",
-          "description": "Python interpreter to use for the language server. If empty, auto-detects a Python with tiled_server installed."
+          "default": "python3",
+          "description": "Python interpreter to use for the language server."
         },
         "tiled.server.args": {
           "type": "array",
