@@ -228,6 +228,12 @@ def build_definition(
         if loc:
             return loc
 
+    # Resolve bare references to imported symbols (e.g. GemmWarpPolicy.FullRow)
+    if root:
+        loc = _resolve_imported_ref(root, lines, line, position.character)
+        if loc:
+            return loc
+
     return None
 
 
@@ -356,4 +362,78 @@ def _resolve_import(
                     end=lsp.Position(line=line_no, character=0),
                 ),
             )
+    return None
+
+
+def _resolve_imported_ref(
+    root: str, all_lines: list[str], line: str, character: int
+) -> Optional[lsp.Location]:
+    """Resolve a bare imported symbol reference like GemmWarpPolicy.FullRow."""
+    # Match Identifier or Identifier.member at cursor
+    for m in re.finditer(r"\b(\w+)(?:\.(\w+))?\b", line):
+        name_start, name_end = m.start(1), m.end(1)
+        member = m.group(2)
+        full_end = m.end(0)
+        if not (name_start <= character <= full_end):
+            continue
+        symbol_name = m.group(1)
+        on_member = member and character > m.start(2) - 1
+
+        # Scan file imports for this symbol
+        module_path = None
+        for src_line in all_lines:
+            # from tilelang.xxx import ..., Symbol, ...
+            im = re.match(
+                r"^from\s+(tilelang(?:\.\w+)*)\s+import\s+(.+)", src_line
+            )
+            if im:
+                for n in re.finditer(r"\b(\w+)\b", im.group(2)):
+                    if n.group(1) == symbol_name:
+                        module_path = im.group(1)
+                        break
+            if module_path:
+                break
+
+        if not module_path:
+            continue
+
+        # Resolve the class/function location
+        loc = _resolve_import(root, module_path, symbol_name)
+        if not loc:
+            continue
+
+        if on_member and member:
+            # Find member inside the resolved file
+            filepath = loc.uri.replace("file://", "")
+            member_line = _find_member_in_file(filepath, member)
+            if member_line is not None:
+                return lsp.Location(
+                    uri=loc.uri,
+                    range=lsp.Range(
+                        start=lsp.Position(line=member_line, character=0),
+                        end=lsp.Position(line=member_line, character=0),
+                    ),
+                )
+        return loc
+    return None
+
+
+def _find_member_in_file(filepath: str, member_name: str) -> Optional[int]:
+    """Find a class member (attribute, method, enum value) in a file."""
+    if not os.path.isfile(filepath):
+        return None
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        patterns = [
+            re.compile(rf"^\s+{re.escape(member_name)}\s*="),
+            re.compile(rf"^\s+def {re.escape(member_name)}\b"),
+            re.compile(rf"^\s+class {re.escape(member_name)}\b"),
+        ]
+        for i, line in enumerate(lines):
+            for pat in patterns:
+                if pat.search(line):
+                    return i
+    except OSError:
+        pass
     return None
