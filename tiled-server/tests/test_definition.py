@@ -236,6 +236,17 @@ import tilelang
         assert loc is not None
         assert loc.uri.endswith("language/__init__.py")
 
+    def test_import_alias(self):
+        """Cursor on 'T' alias in 'import tilelang.language as T'."""
+        doc = _make_document(self.CODE)
+        # Find the 'T' that appears after 'as '
+        line = self.CODE.split("\n")[0]
+        idx = line.rindex("T")  # last T on the line (the alias)
+        pos = lsp.Position(line=0, character=idx)
+        loc = build_definition(doc, pos, FOLDERS)
+        assert loc is not None
+        assert loc.uri.endswith("language/__init__.py")
+
     def test_from_import_module_path(self):
         """Cursor on 'tileop' in 'from tilelang.tileop.base import ...'."""
         doc = _make_document(self.CODE)

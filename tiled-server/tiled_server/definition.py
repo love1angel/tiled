@@ -442,7 +442,7 @@ def _resolve_import_line(
         return None
 
     # "import tilelang.xxx.yyy [as Z]"
-    m_imp = re.match(r"^import\s+(tilelang(?:\.\w+)*)(?:\s+as\s+\w+)?", line)
+    m_imp = re.match(r"^import\s+(tilelang(?:\.\w+)*)(?:\s+as\s+(\w+))?", line)
     if m_imp:
         module_path = m_imp.group(1)
         mod_start = m_imp.start(1)
@@ -450,6 +450,13 @@ def _resolve_import_line(
         if mod_start <= character <= mod_end:
             prefix = _dotted_prefix_at(module_path, character - mod_start)
             return _resolve_module_path(root, prefix)
+        # Cursor on the alias (e.g. T in "import tilelang.language as T")
+        alias = m_imp.group(2)
+        if alias:
+            alias_start = m_imp.start(2)
+            alias_end = m_imp.end(2)
+            if alias_start <= character <= alias_end:
+                return _resolve_module_path(root, module_path)
 
     return None
 
