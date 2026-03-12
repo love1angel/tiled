@@ -267,30 +267,56 @@ function checkServerInstalled(
     return;
   }
 
+  const extVersion: string =
+    vscode.extensions.getExtension("tile-ai.vscode-tiled")?.packageJSON
+      ?.version ?? "";
+
   execFile(
     pythonPath,
     ["-c", "import tiled_server; print(tiled_server.__version__)"],
     { timeout: 10000 },
     async (error, stdout, _stderr) => {
-      if (!error && stdout.trim()) {
+      if (error || !stdout.trim()) {
+        const install = "Install tile-lsp";
+        const choice = await vscode.window.showWarningMessage(
+          "TileLang language server (tile-lsp) is not installed. " +
+            "Install it to enable completions, hover docs, and diagnostics.",
+          install,
+          "Dismiss"
+        );
+
+        if (choice === install) {
+          const terminal = vscode.window.createTerminal("tile-lsp install");
+          terminal.show();
+          terminal.sendText(`${pythonPath} -m pip install tile-lsp`);
+          vscode.window.showInformationMessage(
+            "Installing tile-lsp... Reload the window after installation completes."
+          );
+        }
         return;
       }
 
-      const install = "Install tile-lsp";
-      const choice = await vscode.window.showWarningMessage(
-        "TileLang language server (tile-lsp) is not installed. " +
-          "Install it to enable completions, hover docs, and diagnostics.",
-        install,
-        "Dismiss"
-      );
-
-      if (choice === install) {
-        const terminal = vscode.window.createTerminal("tile-lsp install");
-        terminal.show();
-        terminal.sendText(`${pythonPath} -m pip install tile-lsp`);
-        vscode.window.showInformationMessage(
-          "Installing tile-lsp... Reload the window after installation completes."
-        );
+      // Version mismatch check (compare major.minor)
+      const serverVersion = stdout.trim();
+      if (extVersion && serverVersion) {
+        const [extMajor, extMinor] = extVersion.split(".").map(Number);
+        const [srvMajor, srvMinor] = serverVersion.split(".").map(Number);
+        if (extMajor !== srvMajor || extMinor !== srvMinor) {
+          const upgrade = "Upgrade tile-lsp";
+          const choice = await vscode.window.showWarningMessage(
+            `Version mismatch: extension v${extVersion}, server v${serverVersion}. ` +
+              "Some features may not work correctly.",
+            upgrade,
+            "Dismiss"
+          );
+          if (choice === upgrade) {
+            const terminal = vscode.window.createTerminal("tile-lsp upgrade");
+            terminal.show();
+            terminal.sendText(
+              `${pythonPath} -m pip install --upgrade tile-lsp`
+            );
+          }
+        }
       }
     }
   );
