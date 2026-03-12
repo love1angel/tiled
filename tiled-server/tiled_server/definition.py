@@ -82,14 +82,51 @@ _SYMBOL_MODULE: dict[str, str] = {
     "warp_reduce_sum": "reduce_op.py",
     "warp_reduce_max": "reduce_op.py",
     "warp_reduce_min": "reduce_op.py",
+    "warp_reduce_bitand": "reduce_op.py",
+    "warp_reduce_bitor": "reduce_op.py",
     # print_op.py
     "print": "print_op.py",
     "device_assert": "print_op.py",
+    # annotations.py
+    "use_swizzle": "annotations.py",
+    "annotate_layout": "annotations.py",
+    "annotate_safe_value": "annotations.py",
+    "annotate_l2_hit_ratio": "annotations.py",
+    "annotate_restrict_buffers": "annotations.py",
     # customize.py
-    "use_swizzle": "customize.py",
-    "annotate_layout": "customize.py",
-    "use_swizzle_panel": "customize.py",
-    # symbolics.py
+    "dp4a": "customize.py",
+    "clamp": "customize.py",
+    "reshape": "customize.py",
+    "view": "customize.py",
+    "loop_break": "customize.py",
+    # atomic.py
+    "atomic_add": "atomic.py",
+    "atomic_addx2": "atomic.py",
+    "atomic_addx4": "atomic.py",
+    "atomic_max": "atomic.py",
+    "atomic_min": "atomic.py",
+    "atomic_load": "atomic.py",
+    "atomic_store": "atomic.py",
+    # logical.py
+    "any_of": "logical.py",
+    "all_of": "logical.py",
+    # warpgroup.py
+    "ws": "warpgroup.py",
+    # utils.py
+    "index_to_coordinates": "utils.py",
+    # random.py
+    "rng_init": "random.py",
+    "rng_rand": "random.py",
+    "rng_rand_float": "random.py",
+    # pdl.py
+    "pdl_trigger": "pdl.py",
+    "pdl_sync": "pdl.py",
+    # cluster.py
+    "cluster_arrive_relaxed": "cluster.py",
+    "cluster_arrive": "cluster.py",
+    "cluster_wait": "cluster.py",
+    "cluster_sync": "cluster.py",
+    "cluster_rank_in_cluster": "cluster.py",
     "dynamic": "symbolics.py",
     "symbolic": "symbolics.py",
     # frame.py
