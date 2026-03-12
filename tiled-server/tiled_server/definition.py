@@ -94,9 +94,31 @@ _SYMBOL_MODULE: dict[str, str] = {
     # frame.py
     "has_let_value": "frame.py",
     "get_let_value": "frame.py",
+    # tir/entry.py
+    "prim_func": "tir/entry.py",
+    # tir/op.py
+    "if_then_else": "tir/op.py",
+    "infinity": "tir/op.py",
+    "ceildiv": "tir/op.py",
+    "floordiv": "tir/op.py",
+    "exp": "tir/op.py",
+    "log": "tir/op.py",
+    "max": "tir/op.py",
+    "min": "tir/op.py",
+    # atomic.py
+    "atomic_add": "atomic.py",
+    "atomic_addx2": "atomic.py",
     # experimental
     "gemm_sp": "experimental/gemm_sp.py",
     "gemm_sp_v2": "experimental/gemm_sp.py",
+}
+
+# Map tilelang.<symbol> to (subpath, file) relative to tilelang package root
+_TOPLEVEL_MODULE: dict[str, str] = {
+    "autotune": "autotuner/tuner.py",
+    "jit": "jit/__init__.py",
+    "TensorSupplyType": "utils/tensor.py",
+    "prim_func": "language/tir/entry.py",
 }
 
 
@@ -181,7 +203,7 @@ def build_definition(
         sym_start, sym_end = m.start(1), m.end(1)
         if sym_start <= position.character <= sym_end:
             symbol_name = m.group(1)
-            module_file = _SYMBOL_MODULE.get(symbol_name)
+            module_file = _TOPLEVEL_MODULE.get(symbol_name)
             if module_file:
                 root = _find_tilelang_root(workspace_folders)
                 if root:
