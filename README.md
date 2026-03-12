@@ -106,9 +106,20 @@ Type `T.` to get completions for all TileLang language constructs:
 
 - **Auto-completion** for `T.*` API (alloc_shared, gemm, Pipelined, etc.)
 - **Hover documentation** with signatures and examples
+- **Go to Definition** — jump to source for `T.xxx`, `tilelang.xxx`, and `from tilelang.xxx import ...`
 - **Diagnostics** — warns about common mistakes (missing T.clear before T.gemm, etc.)
 - **Signature help** when typing function arguments
 - **Snippets** — `tl-gemm`, `tl-elementwise`, `tl-kernel`, `tl-attention`, etc.
+
+### Planned
+
+- [ ] **Find All References** (`textDocument/references`)
+- [ ] **Document Symbols** (`textDocument/documentSymbol`) — outline view
+- [ ] **Rename Symbol** (`textDocument/rename`)
+- [ ] **Code Actions / Quick Fix** (`textDocument/codeAction`) — e.g. auto-insert `T.clear()`
+- [ ] **Formatting** (`textDocument/formatting`)
+- [ ] **Semantic Tokens** — syntax highlighting for TileLang constructs
+- [ ] **Code Lens** — inline performance hints
 
 ## Architecture
 
@@ -122,6 +133,7 @@ tiled/
 │   │   ├── completion.py      # Completion provider
 │   │   ├── hover.py           # Hover provider
 │   │   ├── signature.py       # Signature help provider
+│   │   ├── definition.py      # Go-to-definition provider
 │   │   ├── diagnostics.py     # Diagnostics (common mistake warnings)
 │   │   ├── knowledge.py       # TileLang API knowledge base
 │   │   └── utils.py           # Shared helpers

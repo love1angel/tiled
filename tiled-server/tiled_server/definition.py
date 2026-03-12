@@ -220,4 +220,56 @@ def build_definition(
                         )
             break
 
+    # Try "from tilelang.xxx.yyy import Name" pattern
+    m_import = re.match(r"^from\s+(tilelang(?:\.\w+)*)\s+import\s+(.+)", line)
+    if m_import:
+        module_path = m_import.group(1)  # e.g. "tilelang.carver.arch"
+        imports_str = m_import.group(2)  # e.g. "CUDA" or "CUDA, CDNA"
+        # Find which imported name the cursor is on
+        for m_name in re.finditer(r"\b(\w+)\b", imports_str):
+            abs_start = m_import.start(2) + m_name.start(1)
+            abs_end = m_import.start(2) + m_name.end(1)
+            if abs_start <= position.character <= abs_end:
+                symbol_name = m_name.group(1)
+                root = _find_tilelang_root(workspace_folders)
+                if root:
+                    loc = _resolve_import(root, module_path, symbol_name)
+                    if loc:
+                        return loc
+                break
+
+    return None
+
+
+def _resolve_import(
+    root: str, module_path: str, symbol_name: str
+) -> Optional[lsp.Location]:
+    """Resolve 'from tilelang.x.y import Name' to a source Location."""
+    # Convert tilelang.x.y -> x/y relative to tilelang root
+    parts = module_path.split(".")
+    rel_parts = parts[1:]  # drop "tilelang"
+    base = os.path.join(root, *rel_parts) if rel_parts else root
+
+    # Try: base is a package dir, symbol in __init__.py or a submodule
+    candidates = []
+    if os.path.isdir(base):
+        candidates.append(os.path.join(base, "__init__.py"))
+        # symbol might be a submodule file (e.g. tilelang.tools has Analyzer.py)
+        candidates.append(os.path.join(base, f"{symbol_name}.py"))
+        # lowercase variant
+        candidates.append(os.path.join(base, f"{symbol_name.lower()}.py"))
+    # Try: base.py is a module file
+    candidates.append(base + ".py")
+
+    for filepath in candidates:
+        line_no = _find_def_in_file(filepath, symbol_name)
+        if line_no is not None:
+            uri = f"file://{filepath}"
+            return lsp.Location(
+                uri=uri,
+                range=lsp.Range(
+                    start=lsp.Position(line=line_no, character=0),
+                    end=lsp.Position(line=line_no, character=0),
+                ),
+            )
     return None
