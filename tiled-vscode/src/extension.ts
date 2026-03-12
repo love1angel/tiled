@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { execFileSync } from "child_process";
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -7,6 +8,31 @@ import {
 } from "vscode-languageclient/node";
 
 let client: LanguageClient | undefined;
+const outputChannel = vscode.window.createOutputChannel("TileLang (tiled)");
+
+/**
+ * Find a Python interpreter that has tiled_server installed.
+ * Priority: user-configured > python (conda/venv) > python3 > which tiled.
+ */
+function findPython(configured: string): string | undefined {
+  const candidates = configured
+    ? [configured]
+    : ["python", "python3"];
+
+  for (const py of candidates) {
+    try {
+      execFileSync(py, ["-c", "import tiled_server"], {
+        timeout: 5000,
+        stdio: "ignore",
+      });
+      outputChannel.appendLine(`[tiled] Using Python: ${py}`);
+      return py;
+    } catch {
+      // not available or tiled_server not installed
+    }
+  }
+  return undefined;
+}
 
 export async function activate(
   context: vscode.ExtensionContext
@@ -17,21 +43,28 @@ export async function activate(
     return;
   }
 
-  const pythonPath = config.get<string>("server.pythonPath", "python3");
+  const configuredPython = config.get<string>("server.pythonPath", "");
   const customServerPath = config.get<string>("server.path", "");
   const extraArgs = config.get<string[]>("server.args", []);
 
   let serverOptions: ServerOptions;
 
   if (customServerPath) {
-    // Use custom server binary path
     serverOptions = {
       command: customServerPath,
       args: extraArgs,
       transport: TransportKind.stdio,
     };
   } else {
-    // Use python -m tiled_server (works if tiled-lsp is pip-installed)
+    const pythonPath = findPython(configuredPython);
+    if (!pythonPath) {
+      const msg =
+        "tiled: Cannot find a Python with tiled_server installed. " +
+        'Run "pip install tile-lsp" or set tiled.server.pythonPath.';
+      outputChannel.appendLine(`[tiled] ERROR: ${msg}`);
+      vscode.window.showErrorMessage(msg);
+      return;
+    }
     serverOptions = {
       command: pythonPath,
       args: ["-m", "tiled_server", ...extraArgs],
@@ -42,7 +75,7 @@ export async function activate(
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "python" }],
     diagnosticCollectionName: "tiled",
-    outputChannelName: "TileLang (tiled)",
+    outputChannel,
     middleware: {
       // Only provide tilelang features for files that import tilelang
       provideCompletionItem: async (document, position, context, token, next) => {
