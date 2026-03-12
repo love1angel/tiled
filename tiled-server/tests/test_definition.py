@@ -1,15 +1,35 @@
 """Tests for Go-to-definition provider."""
 
+import importlib.util
 import os
 import types
 
 import pytest
 from lsprotocol import types as lsp
 
-from tiled_server.definition import build_definition
+from tiled_server.definition import build_definition, _find_tilelang_root
 
-# The tilelang package root is at ~/tilelang/tilelang
-TILELANG_ROOT = os.path.join(os.path.expanduser("~"), "tilelang")
+
+def _discover_tilelang_root() -> str | None:
+    """Find tilelang package root — pip-installed or source tree."""
+    # 1. pip / importlib
+    try:
+        spec = importlib.util.find_spec("tilelang")
+        if spec and spec.origin:
+            pkg_dir = os.path.dirname(spec.origin)
+            if os.path.isdir(os.path.join(pkg_dir, "language")):
+                # Return the *parent* of tilelang/ so workspace-folder mock works
+                return os.path.dirname(pkg_dir)
+    except (ModuleNotFoundError, ValueError):
+        pass
+    # 2. Common source-tree location
+    src = os.path.join(os.path.expanduser("~"), "tilelang")
+    if os.path.isdir(os.path.join(src, "tilelang", "language")):
+        return src
+    return None
+
+
+TILELANG_ROOT = _discover_tilelang_root()
 
 
 def _make_workspace_folder(path: str):
@@ -39,8 +59,8 @@ def _assert_line_contains(loc: lsp.Location, expected: str):
 
 # Skip all tests if tilelang source tree is not available
 pytestmark = pytest.mark.skipif(
-    not os.path.isdir(os.path.join(TILELANG_ROOT, "tilelang", "language")),
-    reason="tilelang source tree not found",
+    TILELANG_ROOT is None,
+    reason="tilelang not found (neither pip-installed nor at ~/tilelang)",
 )
 
 FOLDERS = [_make_workspace_folder(TILELANG_ROOT)]
@@ -356,3 +376,56 @@ T.foo()
         pos = lsp.Position(line=4, character=3)  # cursor on 'foo'
         loc = build_definition(doc, pos, FOLDERS)
         assert loc is None
+
+
+# ── _find_tilelang_root discovery ───────────────────────────────────
+
+class TestFindTileLangRoot:
+    """_find_tilelang_root should work with workspace folders and pip."""
+
+    def test_workspace_folder(self):
+        """Should find tilelang when workspace IS the tilelang repo."""
+        folders = [_make_workspace_folder(TILELANG_ROOT)]
+        root = _find_tilelang_root(folders)
+        assert root is not None
+        assert os.path.isdir(os.path.join(root, "language"))
+
+    def test_child_workspace(self):
+        """Should find tilelang when workspace is a subdirectory."""
+        child = os.path.join(TILELANG_ROOT, "examples")
+        if not os.path.isdir(child):
+            pytest.skip("examples/ directory not present")
+        folders = [_make_workspace_folder(child)]
+        root = _find_tilelang_root(folders)
+        assert root is not None
+        assert os.path.isdir(os.path.join(root, "language"))
+
+    def test_unrelated_workspace_still_finds(self):
+        """With unrelated workspace, should still find via pip or source."""
+        folders = [_make_workspace_folder("/tmp")]
+        root = _find_tilelang_root(folders)
+        # This will find it via importlib if pip-installed,
+        # otherwise None (source-tree only works via workspace match).
+        # We don't assert not-None because pip install may not exist.
+        if root is not None:
+            assert os.path.isdir(os.path.join(root, "language"))
+
+    def test_empty_folders(self):
+        """With no workspace folders, should still find via pip if installed."""
+        root = _find_tilelang_root([])
+        if root is not None:
+            assert os.path.isdir(os.path.join(root, "language"))
+
+    def test_definition_works_with_empty_folders(self):
+        """Go-to-definition should work even without workspace folders
+        if tilelang is pip-installed."""
+        root = _find_tilelang_root([])
+        if root is None:
+            pytest.skip("tilelang not pip-installed, cannot test empty folders")
+        doc = _make_document(
+            "import tilelang.language as T\n\nT.gemm(A, B, C)\n"
+        )
+        pos = lsp.Position(line=2, character=4)
+        loc = build_definition(doc, pos, [])
+        assert loc is not None
+        assert loc.uri.endswith("gemm_op.py")

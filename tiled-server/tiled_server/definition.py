@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import logging
 import os
 import re
@@ -123,7 +124,13 @@ _TOPLEVEL_MODULE: dict[str, str] = {
 
 
 def _find_tilelang_root(workspace_folders: list) -> Optional[str]:
-    """Find the tilelang package root in workspace or nearby directories."""
+    """Find the tilelang package root.
+
+    Search order:
+    1. Workspace folders (developer working on tilelang source)
+    2. pip-installed package via importlib
+    """
+    # 1. Workspace folders
     for folder in workspace_folders:
         uri = folder.uri if hasattr(folder, "uri") else str(folder)
         path = uri.replace("file://", "")
@@ -136,6 +143,17 @@ def _find_tilelang_root(workspace_folders: list) -> Optional[str]:
         candidate2 = os.path.join(parent, "tilelang", "language")
         if os.path.isdir(candidate2):
             return os.path.join(parent, "tilelang")
+
+    # 2. pip-installed package
+    try:
+        spec = importlib.util.find_spec("tilelang")
+        if spec and spec.origin:
+            pkg_dir = os.path.dirname(spec.origin)
+            if os.path.isdir(os.path.join(pkg_dir, "language")):
+                return pkg_dir
+    except (ModuleNotFoundError, ValueError):
+        pass
+
     return None
 
 
