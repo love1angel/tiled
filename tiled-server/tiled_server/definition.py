@@ -162,6 +162,19 @@ def _find_def_in_file(filepath: str, symbol_name: str) -> Optional[int]:
     return None
 
 
+def _find_language_alias(lines: list[str]) -> Optional[str]:
+    """Find the alias used for ``import tilelang.language as <alias>``.
+
+    Returns the alias string (e.g. ``"T"``, ``"TL"``) or *None* if the
+    import is not present.
+    """
+    for line in lines:
+        m = re.match(r"^\s*import\s+tilelang\.language\s+as\s+(\w+)", line)
+        if m:
+            return m.group(1)
+    return None
+
+
 def build_definition(
     document, position: lsp.Position, workspace_folders: list
 ) -> Optional[lsp.Location]:
@@ -176,27 +189,60 @@ def build_definition(
 
     line = lines[position.line]
 
-    # Try T.xxx pattern
-    for m in re.finditer(r"\bT\.(\w+)", line):
-        sym_start, sym_end = m.start(1), m.end(1)
-        if sym_start <= position.character <= sym_end:
-            symbol_name = m.group(1)
-            module_file = _SYMBOL_MODULE.get(symbol_name)
-            if module_file:
+    # Detect the alias used for tilelang.language (e.g. T, TL, lang, ...)
+    alias = _find_language_alias(lines)
+
+    # Try alias.xxx.yyy pattern (e.g. T.GemmWarpPolicy.FullRow)
+    if alias:
+        pat_cls = re.compile(rf"\b{re.escape(alias)}\.(\w+)\.(\w+)")
+        for m in pat_cls.finditer(line):
+            full_start = m.start(1)
+            full_end = m.end(2)
+            if full_start <= position.character <= full_end:
+                class_name = m.group(1)
+                member_name = m.group(2)
+                on_member = position.character >= m.start(2)
                 root = _find_tilelang_root(workspace_folders)
                 if root:
-                    filepath = os.path.join(root, "language", module_file)
-                    line_no = _find_def_in_file(filepath, symbol_name)
-                    if line_no is not None:
-                        uri = f"file://{filepath}"
-                        return lsp.Location(
-                            uri=uri,
-                            range=lsp.Range(
-                                start=lsp.Position(line=line_no, character=0),
-                                end=lsp.Position(line=line_no, character=0),
-                            ),
-                        )
-            break
+                    loc = _resolve_t_reexport(root, class_name)
+                    if loc and on_member:
+                        filepath = loc.uri.replace("file://", "")
+                        member_line = _find_member_in_file(filepath, member_name)
+                        if member_line is not None:
+                            return lsp.Location(
+                                uri=loc.uri,
+                                range=lsp.Range(
+                                    start=lsp.Position(line=member_line, character=0),
+                                    end=lsp.Position(line=member_line, character=0),
+                                ),
+                            )
+                    if loc:
+                        return loc
+                break
+
+    # Try alias.xxx pattern (e.g. T.gemm, TL.alloc_shared)
+    if alias:
+        pat_sym = re.compile(rf"\b{re.escape(alias)}\.(\w+)")
+        for m in pat_sym.finditer(line):
+            sym_start, sym_end = m.start(1), m.end(1)
+            if sym_start <= position.character <= sym_end:
+                symbol_name = m.group(1)
+                module_file = _SYMBOL_MODULE.get(symbol_name)
+                if module_file:
+                    root = _find_tilelang_root(workspace_folders)
+                    if root:
+                        filepath = os.path.join(root, "language", module_file)
+                        line_no = _find_def_in_file(filepath, symbol_name)
+                        if line_no is not None:
+                            uri = f"file://{filepath}"
+                            return lsp.Location(
+                                uri=uri,
+                                range=lsp.Range(
+                                    start=lsp.Position(line=line_no, character=0),
+                                    end=lsp.Position(line=line_no, character=0),
+                                ),
+                            )
+                break
 
     # Try tilelang.xxx pattern (in non-import expressions like @tilelang.jit)
     if not line.lstrip().startswith(("from ", "import ")):
@@ -362,6 +408,35 @@ def _resolve_import(
                     end=lsp.Position(line=line_no, character=0),
                 ),
             )
+    return None
+
+
+def _resolve_t_reexport(
+    root: str, symbol_name: str
+) -> Optional[lsp.Location]:
+    """Resolve a symbol accessed via T.xxx by scanning language/__init__.py re-exports."""
+    init_path = os.path.join(root, "language", "__init__.py")
+    if not os.path.isfile(init_path):
+        return None
+    try:
+        with open(init_path, "r", encoding="utf-8") as f:
+            init_lines = f.readlines()
+    except OSError:
+        return None
+
+    for src_line in init_lines:
+        m = re.match(r"^from\s+([\w.]+)\s+import\s+(.+)", src_line)
+        if not m:
+            continue
+        for n in re.finditer(r"\b(\w+)\b", m.group(2)):
+            if n.group(1) == symbol_name:
+                module_path = m.group(1)
+                # Resolve relative imports (leading dot)
+                if not module_path.startswith("tilelang"):
+                    # relative import like ".tileop.base" — not a dotted module path
+                    # Reconstruct as absolute: tilelang.language.<rel>
+                    continue
+                return _resolve_import(root, module_path, symbol_name)
     return None
 
 
