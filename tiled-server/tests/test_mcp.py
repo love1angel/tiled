@@ -8,6 +8,10 @@ from tiled_server.mcp import (
     autotune,
     search_examples,
     read_example,
+    list_apis,
+    lookup_api as lookup_api_tool,
+    get_templates,
+    get_optimization_tips,
     # Resources
     api_index,
     api_lookup,
@@ -104,6 +108,65 @@ class TestBestPractices:
     def test_not_empty(self):
         result = best_practices_resource()
         assert len(result) > 100
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Knowledge query tools (list_apis, lookup_api, get_templates, get_optimization_tips)
+# ═══════════════════════════════════════════════════════════════════
+
+
+class TestListApis:
+    def test_all_categories(self):
+        result = list_apis()
+        assert "memory" in result.lower()
+        assert "compute" in result.lower()
+        assert "alloc_shared" in result
+
+    def test_filter_by_category(self):
+        result = list_apis(category="memory")
+        assert "alloc_shared" in result
+        assert "gemm" not in result
+
+    def test_unknown_category(self):
+        result = list_apis(category="nonexistent_xyz")
+        assert "Unknown category" in result
+
+
+class TestLookupApiTool:
+    def test_known_symbol(self):
+        result = lookup_api_tool("gemm")
+        assert "gemm" in result.lower()
+
+    def test_with_prefix(self):
+        result = lookup_api_tool("T.alloc_shared")
+        assert "alloc_shared" in result
+
+    def test_unknown(self):
+        result = lookup_api_tool("nonexistent_xyz")
+        assert "not found" in result.lower()
+
+
+class TestGetTemplates:
+    def test_returns_templates(self):
+        result = get_templates()
+        assert "gemm" in result.lower()
+        assert "```python" in result
+
+    def test_has_all_templates(self):
+        result = get_templates()
+        assert "elementwise" in result.lower()
+        assert "flash_attention" in result.lower()
+
+
+class TestGetOptimizationTips:
+    def test_returns_tips_and_practices(self):
+        result = get_optimization_tips()
+        assert "Optimization Tips" in result
+        assert "Best Practices" in result
+
+    def test_has_code_examples(self):
+        result = get_optimization_tips()
+        assert "```python" in result
 
 
 # ═══════════════════════════════════════════════════════════════════

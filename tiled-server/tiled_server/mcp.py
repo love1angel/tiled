@@ -1,10 +1,10 @@
-"""TileLang MCP server — real GPU tools + static knowledge resources.
+"""TileLang MCP server — GPU tools + knowledge query tools + static resources.
 
-Tools (5): compile_and_benchmark, analyze_kernel, autotune, search_examples,
-read_example — wrap tilelang's Analyzer, Profiler, and AutoTuner.
+Tools (9): compile_and_benchmark, analyze_kernel, autotune, search_examples,
+read_example, list_apis, lookup_api, get_templates, get_optimization_tips.
 
-Resources: API docs, templates, optimization tips, best practices — served as
-static context (no round-trip needed for the LLM to read them).
+Resources: API docs, templates, optimization tips, best practices — also
+available as static context for LLMs that support MCP resources.
 """
 
 from __future__ import annotations
@@ -31,10 +31,10 @@ from .knowledge import (
 mcp = FastMCP(
     "tilelang-mcp",
     instructions=(
-        "TileLang GPU kernel assistant.  Use the 5 tools for real GPU work "
-        "(compile_and_benchmark, analyze_kernel, autotune, search_examples, "
-        "read_example).  Read the resources for API docs, templates, "
-        "optimization tips, and best practices — they are static context."
+        "TileLang GPU kernel assistant.  Use the 9 tools for GPU work and "
+        "knowledge queries (compile_and_benchmark, analyze_kernel, autotune, "
+        "search_examples, read_example, list_apis, lookup_api, get_templates, "
+        "get_optimization_tips).  Read the resources for static context."
     ),
 )
 
@@ -161,6 +161,61 @@ def best_practices_resource() -> str:
             lines.append(f"- {p}")
         lines.append("")
     return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Tool 6–9: Knowledge query tools (make resources callable)
+# ═══════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def list_apis(category: str = "") -> str:
+    """List TileLang API symbols, optionally filtered by category.
+
+    Call with no arguments to see all categories and symbols.
+    Call with a category name (e.g. "memory", "compute", "loop") to see only that category.
+    """
+    if category:
+        syms = list_symbols_by_category(category)
+        if not syms:
+            cats = list_categories()
+            return f"Unknown category '{category}'. Available: {', '.join(cats.keys())}"
+        lines = [f"## {category}\n"]
+        for sym in syms:
+            lines.append(f"- `{sym['detail']}` — {sym['documentation'].split(chr(10))[0]}")
+        return "\n".join(lines)
+    return api_index()
+
+
+@mcp.tool()
+def lookup_api(name: str) -> str:
+    """Look up detailed documentation for a specific TileLang API symbol.
+
+    Examples: lookup_api("gemm"), lookup_api("T.alloc_shared"), lookup_api("tilelang.jit")
+    """
+    return api_lookup(name)
+
+
+@mcp.tool()
+def get_templates() -> str:
+    """Get all available TileLang kernel code templates.
+
+    Returns 6 complete code templates: gemm, elementwise, reduction,
+    softmax, flash_attention, autotune_gemm.
+    """
+    return templates_index()
+
+
+@mcp.tool()
+def get_optimization_tips() -> str:
+    """Get TileLang performance optimization tips and best practices.
+
+    Returns optimization tips (pipelining, memory, etc.) and best practices
+    for writing high-performance TileLang kernels.
+    """
+    tips = optimization_tips_resource()
+    practices = best_practices_resource()
+    return f"{tips}\n\n---\n\n{practices}"
 
 
 # ═══════════════════════════════════════════════════════════════════

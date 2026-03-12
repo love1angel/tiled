@@ -132,12 +132,16 @@ Type `T.` to get completions for all TileLang language constructs:
 
 ### MCP Server (AI Agent Tools)
 
-The MCP server provides 5 tools and 4 resources for AI agents (GitHub Copilot, Claude, etc.):
+The MCP server provides 9 tools and 4 resources for AI agents (GitHub Copilot, Claude, etc.):
 
 **Tools:**
 
 | Tool | Description | Requires GPU |
 |------|------------|:---:|
+| `list_apis` | List all API symbols, optionally filtered by category | No |
+| `lookup_api` | Look up detailed docs for a specific symbol | No |
+| `get_templates` | Get all kernel code templates (gemm, attention, etc.) | No |
+| `get_optimization_tips` | Get optimization tips and best practices | No |
 | `compile_and_benchmark` | Compile a TileLang kernel and measure performance | Yes |
 | `analyze_kernel` | Analyze kernel bottlenecks (FLOPs, roofline, memory) | Yes |
 | `autotune` | Auto-tune kernel configurations | Yes |
