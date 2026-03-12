@@ -1,20 +1,20 @@
 # tiled
 
-**TileLang Language Server & VS Code Extension**
+**TileLang Language Server, MCP Server & VS Code Extension**
 
-Language intelligence for the [TileLang](https://github.com/tile-ai/tilelang) GPU kernel DSL.
+Language intelligence and AI-powered tools for the [TileLang](https://github.com/tile-ai/tilelang) GPU kernel DSL.
 
 ## Installation
 
 ### From PyPI & VS Code Marketplace (recommended)
 
-**1. Install the language server:**
+**1. Install the language server + MCP server:**
 
 ```bash
 pip install tile-lsp
 ```
 
-This installs the `tiled` command (the language server binary).
+This installs the `tiled` command — includes both the LSP server and MCP server.
 
 **2. Install the VS Code extension:**
 
@@ -23,6 +23,8 @@ Search for **tiled (TileLang)** in the VS Code Extensions sidebar, or install fr
 ```bash
 code --install-extension tile-ai.vscode-tiled
 ```
+
+The extension auto-detects if `tile-lsp` is installed. If not, it will prompt you to install it (similar to how clangd extension works).
 
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/tile-ai.vscode-tiled?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=tile-ai.vscode-tiled)
 [![PyPI](https://img.shields.io/pypi/v/tile-lsp?label=PyPI)](https://pypi.org/project/tile-lsp/)
@@ -54,7 +56,7 @@ The extension works out of the box after installing `tile-lsp`. If needed, add t
 
 ### From Source
 
-**Language Server:**
+**Language Server + MCP Server:**
 
 ```bash
 cd tiled-server
@@ -67,9 +69,24 @@ tiled --help
 ```bash
 cd tiled-vscode
 npm install
-npm run compile
+npm run bundle
 npx @vscode/vsce package
-code --install-extension vscode-tiled-1.2.0.vsix
+code --install-extension vscode-tiled-1.3.0.vsix
+```
+
+## CLI
+
+```bash
+# Start LSP server (default, used by VS Code extension automatically)
+tiled
+tiled lsp
+tiled lsp --tcp --port 2087
+
+# Start MCP server (stdio, used by Copilot/AI agents)
+tiled mcp
+
+# Check version
+tiled --version
 ```
 
 ## Usage
@@ -104,12 +121,72 @@ Type `T.` to get completions for all TileLang language constructs:
 
 ## Features
 
+### LSP (Language Server)
+
 - **Auto-completion** for `T.*` API (alloc_shared, gemm, Pipelined, etc.)
 - **Hover documentation** with signatures and examples
 - **Go to Definition** — jump to source for `T.xxx`, `T.XXX.YYY`, `tilelang.xxx`, `tilelang.xxx.yyy`, import aliases, `from tilelang.xxx import ...`, and bare imported symbols
 - **Diagnostics** — warns about common mistakes (missing T.clear before T.gemm, etc.)
 - **Signature help** when typing function arguments
 - **Snippets** — `tl-gemm`, `tl-elementwise`, `tl-kernel`, `tl-attention`, etc.
+
+### MCP Server (AI Agent Tools)
+
+The MCP server provides 5 tools and 4 resources for AI agents (GitHub Copilot, Claude, etc.):
+
+**Tools:**
+
+| Tool | Description | Requires GPU |
+|------|------------|:---:|
+| `compile_and_benchmark` | Compile a TileLang kernel and measure performance | Yes |
+| `analyze_kernel` | Analyze kernel bottlenecks (FLOPs, roofline, memory) | Yes |
+| `autotune` | Auto-tune kernel configurations | Yes |
+| `search_examples` | Search TileLang official examples by keyword | No |
+| `read_example` | Read source code of a specific example file | No |
+
+**Resources (auto-queried by AI):**
+
+| Resource URI | Description |
+|-------------|-------------|
+| `tilelang://api/index` | Full API reference (124 symbols, 14 categories) |
+| `tilelang://api/{name}` | Detailed docs for a specific API symbol |
+| `tilelang://templates` | 6 kernel templates (gemm, elementwise, reduction, softmax, flash_attention, autotune_gemm) |
+| `tilelang://optimization-tips` | 10 optimization topics with code examples |
+| `tilelang://best-practices` | Best practices for memory, compute, tuning, etc. |
+
+### MCP Setup
+
+The extension registers the MCP server automatically. To configure it manually for your workspace, create `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "tilelang-mcp": {
+      "type": "stdio",
+      "command": "tiled",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+> **Tip**: If VS Code can't find `tiled`, use the full path (e.g. `/path/to/venv/bin/tiled`).
+
+Once the MCP server is running, use natural language in Copilot Chat (Agent mode):
+
+- "帮我 benchmark 这个 kernel" → calls `compile_and_benchmark`
+- "分析这个 kernel 的性能瓶颈" → calls `analyze_kernel`
+- "搜索 flash attention 的示例" → calls `search_examples`
+- "autotune this gemm kernel" → calls `autotune`
+
+### VS Code Commands
+
+| Command | Description |
+|---------|-------------|
+| `TileLang: Restart Language Server` | Restart the LSP server |
+| `TileLang: Optimize Current Kernel` | Open Copilot Chat to analyze the current kernel |
+| `TileLang: Generate Kernel from Template` | Pick from 6 templates and insert code |
+| `TileLang: Benchmark Current Kernel` | Options to benchmark via Copilot or copy command |
 
 ### Planned
 
@@ -125,30 +202,30 @@ Type `T.` to get completions for all TileLang language constructs:
 
 ```
 tiled/
-├── tiled-server/              # Python LSP server (pygls)
+├── tiled-server/              # Python package "tile-lsp"
 │   ├── tiled_server/
-│   │   ├── __main__.py        # CLI entry point
-│   │   ├── server.py          # Server factory & LSP handler wiring
+│   │   ├── __main__.py        # CLI: tiled lsp | tiled mcp
+│   │   ├── server.py          # LSP server (pygls)
+│   │   ├── mcp.py             # MCP server (FastMCP) — 5 tools + 4 resources
+│   │   ├── knowledge.py       # Unified knowledge base (shared by LSP & MCP)
 │   │   ├── detection.py       # Regex patterns & tilelang file detection
 │   │   ├── completion.py      # Completion provider
 │   │   ├── hover.py           # Hover provider
 │   │   ├── signature.py       # Signature help provider
 │   │   ├── definition.py      # Go-to-definition provider
 │   │   ├── diagnostics.py     # Diagnostics (common mistake warnings)
-│   │   ├── knowledge.py       # TileLang API knowledge base
 │   │   └── utils.py           # Shared helpers
 │   ├── tests/
-│   │   ├── conftest.py        # Shared test fixtures
+│   │   ├── test_mcp.py        # MCP server tests (33 tests)
 │   │   ├── test_knowledge.py
-│   │   ├── test_detection.py
 │   │   ├── test_completion.py
 │   │   ├── test_definition.py
 │   │   ├── test_diagnostics.py
 │   │   ├── test_hover.py
-│   │   └── test_server_creation.py
+│   │   └── ...
 │   └── pyproject.toml
-└── tiled-vscode/              # VS Code extension (TypeScript)
-    ├── src/extension.ts       # Extension activation, launches tiled server
+└── tiled-vscode/              # VS Code extension "vscode-tiled"
+    ├── src/extension.ts       # LSP client, MCP registration, auto-install check
     ├── snippets/tilelang.json
     └── package.json
 ```
@@ -156,11 +233,11 @@ tiled/
 ## Development
 
 ```bash
-# Check server version
-tiled --version
+# Run all tests (LSP + MCP)
+cd tiled-server && python -m pytest tests/ -v
 
 # Run server in TCP mode for debugging
-tiled --tcp --port 2087 --log-level debug
+tiled lsp --tcp --port 2087 --log-level debug
 
 # Watch-compile the extension
 cd tiled-vscode && npm run watch
