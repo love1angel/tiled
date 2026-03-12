@@ -1,5 +1,5 @@
 {
-  "name": "tiled",
+  "name": "tilelang",
   "displayName": "TileLang (tiled)",
   "description": "Language support for TileLang DSL — completions, hover docs, diagnostics, and snippets",
   "version": "0.1.0",
