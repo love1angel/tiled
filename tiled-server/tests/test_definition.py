@@ -117,6 +117,16 @@ T.clear(buf)
         assert loc is not None
         assert loc.uri.endswith("fill_op.py")
 
+    def test_bare_alias_t(self):
+        """Cursor on 'T' itself in 'T.gemm(A, B, C)' → language/__init__.py."""
+        doc = _make_document(self.CODE)
+        line = self.CODE.split("\n")[3]
+        idx = line.index("T")
+        pos = lsp.Position(line=3, character=idx)
+        loc = build_definition(doc, pos, FOLDERS)
+        assert loc is not None
+        assert loc.uri.endswith("language/__init__.py")
+
 
 # ── T.xxx.yyy (re-exported class + member via T alias) ─────────────
 

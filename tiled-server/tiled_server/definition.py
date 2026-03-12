@@ -275,6 +275,18 @@ def build_definition(
                         return loc
                 break
 
+    # Try bare alias reference (cursor on T itself in T.xxx)
+    if alias:
+        pat_alias = re.compile(rf"\b{re.escape(alias)}\.")
+        for m in pat_alias.finditer(line):
+            alias_start = m.start()
+            alias_end = alias_start + len(alias)
+            if alias_start <= position.character < alias_end:
+                root = _find_tilelang_root(workspace_folders)
+                if root:
+                    return _resolve_module_path(root, "tilelang.language")
+                break
+
     # Try alias.xxx pattern (e.g. T.gemm, TL.alloc_shared)
     if alias:
         pat_sym = re.compile(rf"\b{re.escape(alias)}\.(\w+)")
@@ -374,6 +386,16 @@ def build_definition(
                                     end=lsp.Position(line=line_no, character=0),
                                 ),
                             )
+                break
+
+    # Try bare 'tilelang' reference (cursor on 'tilelang' in tilelang.xxx)
+    if not line.lstrip().startswith(("from ", "import ")):
+        for m in re.finditer(r"\b(tilelang)\.\w+", line):
+            tl_start, tl_end = m.start(1), m.end(1)
+            if tl_start <= position.character < tl_end:
+                root = _find_tilelang_root(workspace_folders)
+                if root:
+                    return _resolve_module_path(root, "tilelang")
                 break
 
     # Handle import statements: from/import tilelang.xxx.yyy [as Z | import Name]
