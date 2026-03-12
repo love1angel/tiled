@@ -25,7 +25,7 @@ pip install tile_lsp-0.1.0-py3-none-any.whl
 **2. Install the VS Code extension:**
 
 ```bash
-code --install-extension tiled-0.1.0.vsix
+code --install-extension vscode-tiled-0.1.0.vsix
 ```
 
 Or install the `.vsix` manually in VS Code: Extensions sidebar → `···` menu → "Install from VSIX..."
@@ -47,7 +47,7 @@ cd tiled-vscode
 npm install
 npm run compile
 npx @vscode/vsce package
-code --install-extension tiled-0.1.0.vsix
+code --install-extension vscode-tiled-0.1.0.vsix
 ```
 
 ## Usage
