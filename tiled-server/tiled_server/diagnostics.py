@@ -9,6 +9,16 @@ from lsprotocol import types as lsp
 from .detection import is_tilelang_file
 
 _RE_TRIPLE_QUOTE = re.compile(r'("""|\'\'\')')
+_RE_STRING_OR_COMMENT = re.compile(
+    r'#.*$|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'', re.MULTILINE
+)
+
+
+def _strip_strings_and_comments(line: str) -> str:
+    """Replace string literals and comments with spaces (preserving positions)."""
+    def _blank(m: re.Match) -> str:
+        return " " * len(m.group(0))
+    return _RE_STRING_OR_COMMENT.sub(_blank, line)
 
 
 def _string_lines(source: str) -> set[int]:
@@ -48,7 +58,9 @@ def compute_diagnostics(uri: str, source: str) -> list[lsp.Diagnostic]:
     for i, line in enumerate(lines):
         if i in skip:
             continue
-        stripped = line.strip()
+        # Strip string literals and comments so we don't flag code inside them
+        code = _strip_strings_and_comments(line)
+        stripped = code.strip()
 
         # Track @T.prim_func
         if stripped == "@T.prim_func":
@@ -57,17 +69,17 @@ def compute_diagnostics(uri: str, source: str) -> list[lsp.Diagnostic]:
             prim_func_line = i
 
         # Check T.Kernel usage
-        if in_prim_func and "T.Kernel" in line:
+        if in_prim_func and "T.Kernel" in code:
             has_kernel = True
 
         # Warn about common mistakes
 
         # 1. alloc_shared outside Kernel context (heuristic)
-        if "T.alloc_shared" in line and not in_prim_func:
+        if "T.alloc_shared" in code and not in_prim_func:
             diagnostics.append(lsp.Diagnostic(
                 range=lsp.Range(
-                    start=lsp.Position(line=i, character=line.index("T.alloc_shared")),
-                    end=lsp.Position(line=i, character=line.index("T.alloc_shared") + len("T.alloc_shared")),
+                    start=lsp.Position(line=i, character=code.index("T.alloc_shared")),
+                    end=lsp.Position(line=i, character=code.index("T.alloc_shared") + len("T.alloc_shared")),
                 ),
                 message="T.alloc_shared should be used inside a @T.prim_func with T.Kernel context.",
                 severity=lsp.DiagnosticSeverity.Warning,
@@ -75,11 +87,11 @@ def compute_diagnostics(uri: str, source: str) -> list[lsp.Diagnostic]:
             ))
 
         # 2. Deprecated or suspicious patterns
-        if "T.alloc_buffer" in line and is_tilelang_file(source):
+        if "T.alloc_buffer" in code and is_tilelang_file(source):
             diagnostics.append(lsp.Diagnostic(
                 range=lsp.Range(
-                    start=lsp.Position(line=i, character=line.index("T.alloc_buffer")),
-                    end=lsp.Position(line=i, character=line.index("T.alloc_buffer") + len("T.alloc_buffer")),
+                    start=lsp.Position(line=i, character=code.index("T.alloc_buffer")),
+                    end=lsp.Position(line=i, character=code.index("T.alloc_buffer") + len("T.alloc_buffer")),
                 ),
                 message="Consider using T.alloc_shared, T.alloc_fragment, or T.alloc_local instead of T.alloc_buffer for clarity.",
                 severity=lsp.DiagnosticSeverity.Hint,
@@ -87,7 +99,7 @@ def compute_diagnostics(uri: str, source: str) -> list[lsp.Diagnostic]:
             ))
 
         # 3. Missing dtype in Tensor annotation
-        tensor_match = re.search(r"T\.Tensor\(\s*\([^)]+\)\s*\)", line)
+        tensor_match = re.search(r"T\.Tensor\(\s*\([^)]+\)\s*\)", code)
         if tensor_match:
             diagnostics.append(lsp.Diagnostic(
                 range=lsp.Range(
@@ -100,15 +112,15 @@ def compute_diagnostics(uri: str, source: str) -> list[lsp.Diagnostic]:
             ))
 
         # 4. gemm without clear
-        if "T.gemm" in line:
+        if "T.gemm" in code:
             # Look backward for T.clear
             found_clear = False
             for j in range(max(0, i - 20), i):
-                if "T.clear" in lines[j]:
+                if "T.clear" in _strip_strings_and_comments(lines[j]):
                     found_clear = True
                     break
             if not found_clear:
-                col = line.index("T.gemm")
+                col = code.index("T.gemm")
                 diagnostics.append(lsp.Diagnostic(
                     range=lsp.Range(
                         start=lsp.Position(line=i, character=col),
