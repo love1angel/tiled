@@ -89,7 +89,7 @@ export async function activate(
 
   context.subscriptions.push(
     vscode.commands.registerCommand("tiled.optimizeKernel", () =>
-      runMcpOnActiveFile(pythonPath, "optimize")
+      runStaticOptimize(pythonPath)
     )
   );
 
@@ -101,7 +101,7 @@ export async function activate(
 
   context.subscriptions.push(
     vscode.commands.registerCommand("tiled.benchmarkKernel", () =>
-      runMcpOnActiveFile(pythonPath, "benchmark")
+      showBenchmarkOptions()
     )
   );
 
@@ -127,10 +127,10 @@ function isTileLangFile(document: vscode.TextDocument): boolean {
 }
 
 /**
- * Run tilelang-mcp auto_optimize or compile_and_benchmark on the active file,
- * showing results in an output channel.
+ * Run auto_optimize on the active file (static analysis, no GPU needed).
+ * Detects bugs, adds annotations, optimizes loops — all via code pattern matching.
  */
-function runMcpOnActiveFile(pythonPath: string, mode: "optimize" | "benchmark"): void {
+function runStaticOptimize(pythonPath: string): void {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
     vscode.window.showWarningMessage("No active editor.");
@@ -146,24 +146,24 @@ function runMcpOnActiveFile(pythonPath: string, mode: "optimize" | "benchmark"):
   const code = doc.getText();
   const channel = vscode.window.createOutputChannel("TileLang Optimization");
   channel.show();
+  channel.appendLine("Running auto_optimize (static analysis, no GPU required)...\n");
 
-  const toolName = mode === "optimize" ? "auto_optimize" : "compile_and_benchmark";
-  channel.appendLine(`Running ${toolName}...\n`);
-
-  // Call tilelang-mcp via python -m tilelang_mcp.run_tool
   const script = `
 import json, sys
-sys.path.insert(0, "")
 try:
-    from tilelang_mcp.server import ${toolName}
-    result = ${toolName}(code=json.loads(sys.argv[1]))
+    from tilelang_mcp.server import auto_optimize
+    result = auto_optimize(code=json.loads(sys.argv[1]))
     print(result)
+except ImportError:
+    print("Error: tilelang-mcp is not installed.", file=sys.stderr)
+    print("Install it with: pip install git+https://github.com/tile-ai/tilelang-mcp.git", file=sys.stderr)
+    sys.exit(1)
 except Exception as e:
     print(f"Error: {e}", file=sys.stderr)
     sys.exit(1)
 `;
 
-  const child = execFile(
+  execFile(
     pythonPath,
     ["-c", script, JSON.stringify(code)],
     { maxBuffer: 1024 * 1024 },
@@ -175,6 +175,43 @@ except Exception as e:
       channel.appendLine(stdout);
     }
   );
+}
+
+/**
+ * Benchmark requires GPU — show options to the user.
+ */
+async function showBenchmarkOptions(): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    vscode.window.showWarningMessage("No active editor.");
+    return;
+  }
+
+  if (!isTileLangFile(editor.document)) {
+    vscode.window.showWarningMessage("Current file is not a TileLang kernel.");
+    return;
+  }
+
+  const choice = await vscode.window.showInformationMessage(
+    "Benchmarking requires a GPU. How would you like to proceed?",
+    "Ask Copilot",
+    "Copy CI Command",
+    "Cancel"
+  );
+
+  if (choice === "Ask Copilot") {
+    // Open Copilot chat with a pre-filled prompt
+    const fileName = editor.document.fileName.split("/").pop();
+    await vscode.commands.executeCommand(
+      "workbench.action.chat.open",
+      { query: `Use the compile_and_benchmark tool to benchmark the kernel in ${fileName}` }
+    );
+  } else if (choice === "Copy CI Command") {
+    const filePath = vscode.workspace.asRelativePath(editor.document.uri);
+    const cmd = `tilelang-mcp ci ${filePath}`;
+    await vscode.env.clipboard.writeText(cmd);
+    vscode.window.showInformationMessage(`Copied to clipboard: ${cmd}`);
+  }
 }
 
 /**
