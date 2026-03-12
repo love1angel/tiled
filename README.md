@@ -69,7 +69,7 @@ cd tiled-vscode
 npm install
 npm run compile
 npx @vscode/vsce package
-code --install-extension vscode-tiled-0.1.0.vsix
+code --install-extension vscode-tiled-1.2.0.vsix
 ```
 
 ## Usage
@@ -106,7 +106,7 @@ Type `T.` to get completions for all TileLang language constructs:
 
 - **Auto-completion** for `T.*` API (alloc_shared, gemm, Pipelined, etc.)
 - **Hover documentation** with signatures and examples
-- **Go to Definition** — jump to source for `T.xxx`, `tilelang.xxx`, and `from tilelang.xxx import ...`
+- **Go to Definition** — jump to source for `T.xxx`, `T.XXX.YYY`, `tilelang.xxx`, `tilelang.xxx.yyy`, import aliases, `from tilelang.xxx import ...`, and bare imported symbols
 - **Diagnostics** — warns about common mistakes (missing T.clear before T.gemm, etc.)
 - **Signature help** when typing function arguments
 - **Snippets** — `tl-gemm`, `tl-elementwise`, `tl-kernel`, `tl-attention`, etc.
@@ -142,6 +142,7 @@ tiled/
 │   │   ├── test_knowledge.py
 │   │   ├── test_detection.py
 │   │   ├── test_completion.py
+│   │   ├── test_definition.py
 │   │   ├── test_diagnostics.py
 │   │   ├── test_hover.py
 │   │   └── test_server_creation.py
@@ -155,6 +156,9 @@ tiled/
 ## Development
 
 ```bash
+# Check server version
+tiled --version
+
 # Run server in TCP mode for debugging
 tiled --tcp --port 2087 --log-level debug
 

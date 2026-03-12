@@ -3,11 +3,13 @@
 import argparse
 import logging
 
+from . import __version__
 from .server import create_server
 
 
 def main():
     parser = argparse.ArgumentParser(description="tiled — TileLang Language Server")
+    parser.add_argument("-v", "--version", action="version", version=f"tiled {__version__}")
     parser.add_argument("--tcp", action="store_true", help="Use TCP transport")
     parser.add_argument("--stdio", action="store_true", help="Use stdio transport (default)")
     parser.add_argument("--host", default="127.0.0.1", help="TCP host (default: 127.0.0.1)")
