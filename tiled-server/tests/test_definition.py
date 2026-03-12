@@ -3,6 +3,7 @@
 import importlib.util
 import os
 import types
+from typing import Optional
 
 import pytest
 from lsprotocol import types as lsp
@@ -10,7 +11,7 @@ from lsprotocol import types as lsp
 from tiled_server.definition import build_definition, _find_tilelang_root
 
 
-def _discover_tilelang_root() -> str | None:
+def _discover_tilelang_root() -> Optional[str]:
     """Find tilelang package root — pip-installed or source tree."""
     # 1. pip / importlib
     try:
