@@ -6,9 +6,7 @@ Language intelligence for the [TileLang](https://github.com/tile-ai/tilelang) GP
 
 ## Installation
 
-### From Release (recommended)
-
-Download the latest release from [GitHub Releases](https://github.com/love1angel/tiled/releases).
+### From PyPI & VS Code Marketplace (recommended)
 
 **1. Install the language server:**
 
@@ -18,19 +16,16 @@ pip install tile-lsp
 
 This installs the `tiled` command (the language server binary).
 
-Or from a downloaded wheel:
-
-```bash
-pip install tile_lsp-0.1.0-py3-none-any.whl
-```
-
 **2. Install the VS Code extension:**
 
+Search for **tiled (TileLang)** in the VS Code Extensions sidebar, or install from the command line:
+
 ```bash
-code --install-extension vscode-tiled-0.1.0.vsix
+code --install-extension tile-ai.vscode-tiled
 ```
 
-Or install the `.vsix` manually in VS Code: Extensions sidebar → `···` menu → "Install from VSIX..."
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/tile-ai.vscode-tiled?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=tile-ai.vscode-tiled)
+[![PyPI](https://img.shields.io/pypi/v/tile-lsp?label=PyPI)](https://pypi.org/project/tile-lsp/)
 
 **3. Configure (optional):**
 

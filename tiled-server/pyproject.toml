@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tile-lsp"
-version = "0.1.0"
+version = "1.0.0"
 description = "Language server for the TileLang DSL"
 requires-python = ">=3.9"
 dependencies = [
