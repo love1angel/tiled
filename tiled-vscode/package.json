@@ -2,7 +2,7 @@
   "name": "vscode-tiled",
   "displayName": "tiled (TileLang)",
   "description": "Language support for TileLang DSL — completions, hover docs, diagnostics, snippets, and AI-powered kernel optimization",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "publisher": "tile-ai",
   "license": "MIT",
   "repository": {
